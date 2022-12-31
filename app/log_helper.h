@@ -11,11 +11,6 @@
 #define LOG_HELPER_H
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * These helper functions assume a logging buffer has been provided to Microvisor
  * elsewhere in your application.  An example of doing this follows:
@@ -38,6 +33,11 @@ extern "C" {
  */
 #include <stdbool.h>
 #include <stdarg.h>
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 /*

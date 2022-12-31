@@ -39,16 +39,13 @@ extern "C" {
 /*
  * CONSTANTS
  */
+#define     LOGGING_BUFFER_SIZE         1024
+
 #define     LED_GPIO_BANK               GPIOA
 #define     LED_GPIO_PIN                GPIO_PIN_5
 
 #define     LED_TASK_PAUSE_MS           500
-#define     NETWORK_TASK_PAUSE_MS       500
 
-//#define     MQTT_RX_BUFFER_SIZE_B       50*1024
-//#define     MQTT_TX_BUFFER_SIZE_B       5*1024
-//#define     MQTT_NT_BUFFER_COUNT_R      8             // NOTE Count of records, not bytes
-  
 #ifdef __cplusplus
 }
 #endif

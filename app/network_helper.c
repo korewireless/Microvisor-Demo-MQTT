@@ -54,6 +54,33 @@ static void release_network();
 
 
 /**
+ * @brief Function implementing the Network task thread.
+ *
+ * @param  argument: Not used.
+ */
+void start_network_task(void *argument) {
+    uint32_t last_tick = 0;
+    server_log("starting network task...");
+
+    want_network = true;
+
+    // The task's main loop
+    while (1) {
+        // Get the ms timer value
+        uint32_t tick = HAL_GetTick();
+        if (tick - last_tick > NETWORK_TASK_PAUSE_MS) {
+            last_tick = tick;
+
+            spin_network();
+        }
+
+        // End of cycle delay
+        osDelay(have_network() ? 1000 : 100);
+    }
+}
+
+
+/**
  * @brief Call regularly from host application to allow for handling of network status.
  */
 void spin_network() {
@@ -102,31 +129,6 @@ bool have_network() {
 MvNetworkHandle get_network_handle() {
     return network_handle;
 }
-
-
-/**
- * @brief Blocking call which will loop indefinitely until a network connection is established.
- */
-/*
-void wait_for_network() {
-    if (network_handle == 0) {
-        configure_network();
-    }
-
-    while (1) {
-        if (mvGetNetworkStatus(network_handle, &network_status) == MV_STATUS_OKAY &&
-            network_status == MV_NETWORKSTATUS_CONNECTED) {
-            break;
-        }
-
-        // ... or wait a short period before retrying
-        for (volatile unsigned i = 0; i < 50000; ++i) {
-            // No op
-            __asm("nop");
-        }
-    }
-}
-*/
 
 
 /**

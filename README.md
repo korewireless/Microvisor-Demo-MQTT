@@ -1,4 +1,4 @@
-# Microvisor MQTT Demo 2.0.7
+# Microvisor MQTT Demo 1.0.0
 
 This repo provides a basic demonstration of a user application capable of working with Microvisor’s MQTT communications system calls. It has not hardware dependencies beyond the Twilio Microvisor Nucleo Development Board.
 
@@ -14,11 +14,12 @@ Version 1.0.0 is the initial MQTT demo.
 
 ## Actions
 
-The code creates and runs two threads.
+The code creates and runs four threads:
 
-One thread periodically toggles GPIO A5, which is the user LED on the [Microvisor Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board).
-
-The second thread It also emits a “ping” to the Microvisor logger once a second. Every 30 seconds it makes a `GET` request to `https://jsonplaceholder.typicode.com/todos/1`, a free API the delivers an object JSON testing.
+- A thread periodically toggles GPIO A5, which is the user LED on the [Microvisor Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board).  This acts as a heartbeat to let you know the demo is working.
+- A thread manages the network state of your application, requesting control of the network from Microvisor.
+- A work thread which consumes events and dispatches them in support of the configuration loading and managed MQTT broker operations.
+- A data collection thread which consumes data from an attached sensor (or demo source) and sends it to the work thread for publishing.
 
 ## Cloning the Repo
 

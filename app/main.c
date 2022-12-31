@@ -21,7 +21,7 @@
 osThreadId_t LEDTask;
 const osThreadAttr_t led_task_attributes = {
     .name = "LEDTask",
-    .stack_size = 1024,
+    .stack_size = configMINIMAL_STACK_SIZE, // specified in words, size 4 for Microvisor
     .priority = (osPriority_t) osPriorityNormal
 };
 
@@ -29,7 +29,7 @@ const osThreadAttr_t led_task_attributes = {
 osThreadId_t NetworkTask;
 const osThreadAttr_t network_task_attributes = {
     .name = "NetworkTask",
-    .stack_size = 2048,
+    .stack_size = configMINIMAL_STACK_SIZE, // specified in words, size 4 for Microvisor
     .priority = (osPriority_t) osPriorityNormal
 };
 
@@ -37,9 +37,12 @@ const osThreadAttr_t network_task_attributes = {
 osThreadId_t WorkTask;
 const osThreadAttr_t work_task_attributes = {
     .name = "WorkTask",
-    .stack_size = 4096,
+    .stack_size = configMINIMAL_STACK_SIZE + 3072, // specified in words, size 4 for Microvisor - we do a lot of work in this thread, allocate accordingly
     .priority = (osPriority_t) osPriorityNormal
 };
+
+// Buffer for Microvisor application logging
+static uint8_t log_buffer[LOGGING_BUFFER_SIZE] __attribute__((aligned(512))) = {0} ;
 
 
 /*
@@ -48,7 +51,6 @@ const osThreadAttr_t work_task_attributes = {
 static void system_clock_config(void);
 static void gpio_init(void);
 static void start_led_task(void *argument);
-static void start_network_task(void *argument);
 static void log_device_info(void);
 
 
@@ -56,10 +58,6 @@ static void log_device_info(void);
  *  @brief The application entry point.
  */
 int main(void) {
-    // Buffer for Microvisor application logging
-    const uint32_t log_buffer_size = 4096;
-    static uint8_t log_buffer[4096] __attribute__((aligned(512))) = {0} ;
-
     // Reset of all peripherals, Initializes the Flash interface and the sys tick.
     HAL_Init();
 
@@ -73,7 +71,7 @@ int main(void) {
     UART_init();
 
     // Initialize logging buffer, optional if logging not desired
-    (void)mvServerLoggingInit(log_buffer, log_buffer_size);
+    (void)mvServerLoggingInit(log_buffer, LOGGING_BUFFER_SIZE);
 
     // Get the Device ID and build number and log them
     log_device_info();
@@ -84,10 +82,14 @@ int main(void) {
     // Create the FreeRTOS thread(s)
     server_log("starting tasks...");
     LEDTask      = osThreadNew(start_led_task,      NULL, &led_task_attributes);
-    NetworkTask  = osThreadNew(start_network_task,  NULL, &network_task_attributes);
+    assert(LEDTask != NULL);
     WorkTask     = osThreadNew(start_work_task,     NULL, &work_task_attributes);
+    assert(WorkTask != NULL);
+    NetworkTask  = osThreadNew(start_network_task,  NULL, &network_task_attributes);
+    assert(NetworkTask != NULL);
 
     // Start the scheduler
+    server_log("starting scheduler...");
     osKernelStart();
 
     // We should never get here as control is now taken by the scheduler,
@@ -142,33 +144,6 @@ static void start_led_task(void *argument) {
 
         // End of cycle delay
         osDelay(10);
-    }
-}
-
-
-/**
- * @brief Function implementing the Network task thread.
- *
- * @param  argument: Not used.
- */
-static void start_network_task(void *argument) {
-    uint32_t last_tick = 0;
-    server_log("starting network task...");
-
-    want_network = true;
-
-    // The task's main loop
-    while (1) {
-        // Get the ms timer value
-        uint32_t tick = HAL_GetTick();
-        if (tick - last_tick > NETWORK_TASK_PAUSE_MS) {
-            last_tick = tick;
-
-            spin_network();
-        }
-
-        // End of cycle delay
-        osDelay(have_network() ? 1000 : 100);
     }
 }
 

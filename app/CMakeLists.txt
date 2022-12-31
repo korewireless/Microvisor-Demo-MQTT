@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.14)
 # Set application data
 set(APP "Microvisor MQTT Demo")
 set(VERSION_NUMBER "1.0.0")
-set(BUILD_NUMBER "88")
+set(BUILD_NUMBER "1")
 
 message("Building ${APP} ${VERSION_NUMBER} build ${BUILD_NUMBER}")
 
@@ -15,7 +15,9 @@ add_compile_definitions(BUILD_NUM=${BUILD_NUMBER})
 # Compile app source code file(s)
 add_executable(${PROJECT_NAME}
     main.c
+    config_handler.c
     log_helper.c
+    mqtt_handler.c
     network_helper.c
     stm32u5xx_hal_timebase_tim_template.c
     uart_logging.c

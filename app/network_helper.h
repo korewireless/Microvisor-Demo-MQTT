@@ -11,11 +11,6 @@
 #define NETWORK_HELPER_H
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * These functions take ownership from Microvisor for the network state.  By default on
  * Microvisor startup, the network will always be avaialble until you tell it otherwise.
@@ -33,9 +28,15 @@ extern "C" {
 #include "mv_syscalls.h"
 
   
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * PROTOTYPES
  */
+void start_network_task(void *argument);
 void spin_network();
 bool have_network();
 MvNetworkHandle get_network_handle();
@@ -45,6 +46,13 @@ MvNetworkHandle get_network_handle();
  * GLOBALS
  */
 extern volatile bool want_network;
+
+
+/*
+ * DEFINES
+ */
+#define     NETWORK_TASK_PAUSE_MS       500
+
 
 #ifdef __cplusplus
 }
