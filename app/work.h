@@ -57,6 +57,9 @@ enum MessageType {
     OnBrokerUnsubscriptionRequestFailed,
     OnBrokerUnsubscribeFailed,
     OnBrokerUnsubscribeSucceeded,
+    OnBrokerPublishRequestFailed,
+    OnBrokerPublishFailed,
+    OnBrokerPublishSucceeded,
     OnBrokerDisconnected,
 
     // Managed MQTT readable events to handle

@@ -123,6 +123,7 @@ void start_work_task(void *argument) {
                     break;
                 case OnBrokerSubscribeSucceeded:
                     server_log("subscription was successful");
+                    publish_sensor_data(21.0);
                     break;
                 case OnBrokerSubscribeFailed:
                     server_log("subscription failed");
@@ -133,6 +134,13 @@ void start_work_task(void *argument) {
                     break;
                 case OnBrokerUnsubscribeFailed:
                     server_log("unsubscription failed");
+                    teardown_mqtt_connect();
+                    break;
+                case OnBrokerPublishSucceeded:
+                    server_log("publish was successful");
+                    break;
+                case OnBrokerPublishFailed:
+                    server_log("publish failed");
                     teardown_mqtt_connect();
                     break;
                 case OnBrokerConnectFailed:
@@ -164,7 +172,7 @@ void start_work_task(void *argument) {
                     mqtt_handle_unsubscribe_response_event();
                     break;
                 case OnMQTTEventPublishResponse:
-                    // FIXME: impl
+                    mqtt_handle_publish_response_event();
                     break;
                 case OnMQTTEventDisconnectResponse:
                     // FIXME: impl

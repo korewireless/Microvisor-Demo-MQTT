@@ -192,6 +192,38 @@ void end_subscriptions() {
     }
 }
 
+void publish_sensor_data(float temperature) {
+    char topic_str[128];
+    sprintf(topic_str, "topic/sensor/device/%.*s", client_len, client);
+    char payload_str[128];
+    sprintf(payload_str, "%.2f", temperature);
+
+    enum MvStatus status;
+
+    const struct MvMqttPublishRequest request = {
+        .correlation_id = correlation_id++,
+        .topic = {
+            .data = (uint8_t *)topic_str,
+            .length = strlen(topic_str)
+        },
+        .payload = {
+            .data = (uint8_t *)payload_str,
+            .length = strlen(payload_str)
+        },
+        .desired_qos = 0,
+        .retain = 1
+    };
+
+    server_log("starting publish request");
+    status = mvMqttPerformPublishRequest(mqtt_channel, &request);
+    if (status != MV_STATUS_OKAY) {
+        server_error("mvMqttPublishRequest returned 0x%02x\n", (int) status);
+        pushMessage(OnBrokerPublishRequestFailed);
+        return;
+    }
+    server_log("completed publish request");
+}
+
 void mqtt_handle_readable_event() {
     enum MvMqttReadableDataType readableDataType;
     if (mvMqttGetNextReadableDataType(mqtt_channel, &readableDataType) != MV_STATUS_OKAY) {
@@ -347,6 +379,42 @@ void mqtt_handle_unsubscribe_response_event() {
 
     server_log("mqtt unsubscribe successful");
     pushMessage(OnBrokerUnsubscribeSucceeded);
+}
+
+void mqtt_handle_publish_response_event() {
+    server_log("received publish request response");
+    enum MvMqttRequestState request_state;
+    uint32_t correlation_id;
+    uint32_t reason_code;
+    struct MvMqttPublishResponse response = {
+        .request_state = &request_state,
+        .correlation_id = &correlation_id,
+        .reason_code = &reason_code
+    };
+
+    enum MvStatus status = mvMqttReadPublishResponse(mqtt_channel, &response);
+    if (status != MV_STATUS_OKAY) {
+        server_error("mvMqttReadPublishResponse returned 0x%02x\n", (int) status);
+        pushMessage(OnBrokerPublishFailed);
+        return;
+    }
+
+    server_log("publish response.request_state = %d", request_state);
+    if (request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
+        // not the request_state we expect
+        pushMessage(OnBrokerPublishFailed);
+        return;
+    }
+
+    server_log("publish reason_code = 0x%02x", (int) reason_code);
+    if (reason_code != 0x00) {
+        // not the status we expect
+        pushMessage(OnBrokerPublishFailed);
+        return;
+    }
+
+    server_log("mqtt publish successful");
+    pushMessage(OnBrokerPublishSucceeded);
 }
 
 void teardown_mqtt_connect() {
