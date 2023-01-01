@@ -82,7 +82,7 @@ void start_work_task(void *argument) {
         osDelay(1);
 
 		if (osMessageQueueGet(workMessageQueue, &messageType, NULL, 100U /*osWaitForever*/) == osOK) {
-            server_log("received a message: 0x%02x", messageType);
+            server_log("event loop received a message: 0x%02x", messageType);
             switch (messageType) {
                 case ConnectNetwork:
                     server_log("connecting network...");

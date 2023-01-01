@@ -194,9 +194,9 @@ void end_subscriptions() {
 
 void publish_sensor_data(float temperature) {
     char topic_str[128];
-    sprintf(topic_str, "topic/sensor/device/%.*s", client_len, client);
+    sprintf(topic_str, "sensor/device/%.*s", client_len, client); // For AWS, requires policy to allow publish access to "arn:aws:iot:us-west-2:____:topic/sensor/device/<<DEVICE_SID>>"
     char payload_str[128];
-    sprintf(payload_str, "%.2f", temperature);
+    sprintf(payload_str, "{ \"temperature\": %.2f }", temperature);
 
     enum MvStatus status;
 
@@ -211,7 +211,7 @@ void publish_sensor_data(float temperature) {
             .length = strlen(payload_str)
         },
         .desired_qos = 0,
-        .retain = 1
+        .retain = 0
     };
 
     server_log("starting publish request");
