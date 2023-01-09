@@ -49,6 +49,7 @@ enum MessageType {
 
     // Managed MQTT operations and connection events
     ConnectMQTTBroker = 0x50,
+    OnMqttChannelFailed,
     OnBrokerConnectFailed,
     OnBrokerConnected,
     OnBrokerSubscriptionRequestFailed,
@@ -57,10 +58,11 @@ enum MessageType {
     OnBrokerUnsubscriptionRequestFailed,
     OnBrokerUnsubscribeFailed,
     OnBrokerUnsubscribeSucceeded,
-    OnBrokerPublishRequestFailed,
     OnBrokerPublishFailed,
     OnBrokerPublishSucceeded,
+    OnBrokerMessageAcknowledgeFailed,
     OnBrokerDisconnected,
+    OnBrokerDisconnectFailed,
 
     // Managed MQTT readable events to handle
     OnMQTTReadable = 0x70,

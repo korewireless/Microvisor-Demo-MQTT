@@ -50,7 +50,9 @@ static volatile bool                  _have_network = false;
  */
 static void configure_network();
 static void configure_notification_center();
+static void spin_network();
 static void release_network();
+static bool have_network();
 
 
 /**
@@ -83,7 +85,7 @@ void start_network_task(void *argument) {
 /**
  * @brief Call regularly from host application to allow for handling of network status.
  */
-void spin_network() {
+static void spin_network() {
     enum MvNetworkStatus network_status;
 
     if (mvGetNetworkStatus(network_handle, &network_status) == MV_STATUS_OKAY) {
@@ -105,7 +107,7 @@ void spin_network() {
         solicited_change = false;
     }
 
-    if (want_network && !_have_network) {
+    if (want_network && !have_network()) {
         if (network_handle == 0) {
             configure_network();
         }
@@ -118,7 +120,7 @@ void spin_network() {
 /*
  * @brief Indicates if we have a current network connection or not.
  */
-bool have_network() {
+static inline bool have_network() {
     return _have_network;
 }
 
@@ -149,7 +151,7 @@ void release_network() {
 /**
  * @brief Obtain network handle and configure a notification center for networking events.
  */
-void configure_network() {
+static void configure_network() {
     server_log("configuring network...");
 
     want_network = true;
@@ -179,7 +181,7 @@ void configure_network() {
 /**
  * @brief Configure a notification center to use for network events.
  */
-void configure_notification_center() {
+static void configure_notification_center() {
     if (notification_center_handle != 0) {
         return;
     }
@@ -209,10 +211,10 @@ void configure_notification_center() {
  *  @brief Network notification ISR.
  */
 void TIM1_BRK_IRQHandler(void) {
-    volatile struct MvNotification notification = notification_buffer[current_notification_index];
-    if (notification.event_type == MV_EVENTTYPE_NETWORKSTATUSCHANGED) {
+    volatile struct MvNotification *notification = &notification_buffer[current_notification_index];
+    if (notification->event_type == MV_EVENTTYPE_NETWORKSTATUSCHANGED) {
         network_status_changed = true;
-        solicited_change = (notification.tag == USER_TAG_REQUEST_NETWORK);
+        solicited_change = (notification->tag == USER_TAG_REQUEST_NETWORK);
     }
 
     // Point to the next record to be written
@@ -220,5 +222,5 @@ void TIM1_BRK_IRQHandler(void) {
 
     // Clear the current notifications event
     // See https://www.twilio.com/docs/iot/microvisor/microvisor-notifications#buffer-overruns
-    notification.event_type = 0;
+    notification->event_type = 0;
 }

@@ -44,7 +44,13 @@ void mqtt_handle_connect_response_event();
 void mqtt_handle_subscribe_response_event();
 void mqtt_handle_unsubscribe_response_event();
 void mqtt_handle_publish_response_event();
-
+void mqtt_disconnect();
+bool mqtt_get_received_message_data(uint32_t *correlation_id,
+                                    uint8_t **topic, uint32_t *topic_len,
+                                    uint8_t **payload, uint32_t *payload_len,
+                                    uint32_t *qos, uint8_t *retain);
+bool mqtt_handle_lost_message_data();
+void mqtt_acknowledge_message(uint32_t correlation_id);
 
 #ifdef __cplusplus
 }

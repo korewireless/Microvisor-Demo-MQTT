@@ -27,6 +27,9 @@ static bool             broker_connected = false;
 static uint32_t         correlation_id = 0;
 static uint32_t         temp_num_items;
 
+// Arrays to give to the work thread
+static uint8_t in_topic[1024];
+static uint8_t in_payload[1024];
 
 /*
  * @brief Open channel for mqtt tasks
@@ -53,6 +56,7 @@ void start_mqtt_connect() {
     if ((status = mvOpenChannel(&ch_params, &mqtt_channel)) != MV_STATUS_OKAY) {
         // report error
         server_error("encountered error opening config channel: %x", status);
+        pushMessage(OnBrokerConnectFailed);
         return;
     }
 
@@ -218,7 +222,7 @@ void publish_sensor_data(float temperature) {
     status = mvMqttPerformPublishRequest(mqtt_channel, &request);
     if (status != MV_STATUS_OKAY) {
         server_error("mvMqttPublishRequest returned 0x%02x\n", (int) status);
-        pushMessage(OnBrokerPublishRequestFailed);
+        pushMessage(OnBrokerPublishFailed);
         return;
     }
     server_log("completed publish request");
@@ -227,34 +231,34 @@ void publish_sensor_data(float temperature) {
 void mqtt_handle_readable_event() {
     enum MvMqttReadableDataType readableDataType;
     if (mvMqttGetNextReadableDataType(mqtt_channel, &readableDataType) != MV_STATUS_OKAY) {
-        // FIXME: decide if this is fatal or not, it probably is as even if we have no event waiting we should still get _NONE
+        pushMessage(OnMqttChannelFailed);
         return;
     }
 
     server_log("mqtt readable %02x", readableDataType);
     switch (readableDataType) {
-        case MV_MQTTREADABLEDATATYPE_CONNECTRESPONSE: //< Response to a connect request is available.*/
+        case MV_MQTTREADABLEDATATYPE_CONNECTRESPONSE: //< Response to a connect request is available.
             pushMessage(OnMQTTEventConnectResponse);
             break;
-        case MV_MQTTREADABLEDATATYPE_MESSAGERECEIVED: //< A message is ready for consumption.*/
+        case MV_MQTTREADABLEDATATYPE_MESSAGERECEIVED: //< A message is ready for consumption.
             pushMessage(OnMQTTEventMessageReceived);
             break;
-        case MV_MQTTREADABLEDATATYPE_MESSAGELOST: //< A message was lost, details are available.*/
+        case MV_MQTTREADABLEDATATYPE_MESSAGELOST: //< A message was lost, details are available.
             pushMessage(OnMQTTEventMessageLost);
             break;
-        case MV_MQTTREADABLEDATATYPE_SUBSCRIBERESPONSE: //< Response to a subscribe request is available.*/
+        case MV_MQTTREADABLEDATATYPE_SUBSCRIBERESPONSE: //< Response to a subscribe request is available.
             pushMessage(OnMQTTEventSubscribeResponse);
             break;
-        case MV_MQTTREADABLEDATATYPE_UNSUBSCRIBERESPONSE: //< Response to an unsubscribe request is available.*/
+        case MV_MQTTREADABLEDATATYPE_UNSUBSCRIBERESPONSE: //< Response to an unsubscribe request is available.
             pushMessage(OnMQTTEventUnsubscribeResponse);
             break;
-        case MV_MQTTREADABLEDATATYPE_PUBLISHRESPONSE: //< Response to a publish request is available.*/
+        case MV_MQTTREADABLEDATATYPE_PUBLISHRESPONSE: //< Response to a publish request is available.
             pushMessage(OnMQTTEventPublishResponse);
             break;
-        case MV_MQTTREADABLEDATATYPE_DISCONNECTRESPONSE: //< Response to a disconnect operation is available.*/
+        case MV_MQTTREADABLEDATATYPE_DISCONNECTRESPONSE: //< Response to a disconnect operation is available.
             pushMessage(OnMQTTEventDisconnectResponse);
             break;
-        case MV_MQTTREADABLEDATATYPE_NONE: //< No unconsumed data is available at this time.*/
+        case MV_MQTTREADABLEDATATYPE_NONE: //< No unconsumed data is available at this time.
         default:
             break;
     }
@@ -417,9 +421,86 @@ void mqtt_handle_publish_response_event() {
     pushMessage(OnBrokerPublishSucceeded);
 }
 
+bool mqtt_get_received_message_data(uint32_t *correlation_id,
+                                    uint8_t **topic, uint32_t *topic_len,
+                                    uint8_t **payload, uint32_t *payload_len,
+                                    uint32_t *qos, uint8_t *retain) {
+    server_log("received mqtt message");
+    struct MvMqttMessage message = {
+        .correlation_id = correlation_id,
+        .topic = {
+            .data = in_topic,
+            .size = sizeof(in_topic),
+            .length = topic_len,
+        },
+        .payload = {
+            .data = in_payload,
+            .size = sizeof(in_payload),
+            .length = payload_len,
+        },
+        .qos = qos,
+        .retain = retain
+    };
+
+    enum MvStatus status = mvMqttReceiveMessage(mqtt_channel, &message);
+    if (status != MV_STATUS_OKAY) {
+        server_error("mvMqttReceiveMessage returned 0x%02x\n", (int) status);
+        return false;
+    }
+
+    *topic = in_topic;
+    *payload = in_payload;
+
+    return true;
+}
+
+bool mqtt_handle_lost_message_data() {
+    server_log("received mqtt dropped message notification");
+    enum MvMqttLostMessageReason reason;
+    uint32_t topic_len;
+    uint32_t message_len;
+    struct MvMqttLostMessageInfo lostMessage = {
+        .reason = &reason,
+        .topic = {
+            .data = in_topic,
+            .size = sizeof(in_topic),
+            .length = &topic_len,
+        },
+        .message_len = &message_len
+    };
+
+    enum MvStatus status = mvMqttReceiveLostMessageInfo(mqtt_channel, &lostMessage);
+    if (status != MV_STATUS_OKAY) {
+        server_error("mvMqttReceiveLostMessageInfo returned 0x%02x\n", (int) status);
+        return false;
+    }
+
+    server_error("Message with topic %.*s was dropped. MQTT buffer should be at least %d bytes long to receive it.\n", (int) topic_len, in_topic, (int) message_len);
+    return true;
+}
+
+void mqtt_acknowledge_message(uint32_t correlation_id) {
+    enum MvStatus status = mvMqttAcknowledgeMessage(mqtt_channel, correlation_id);
+    if (status != MV_STATUS_OKAY) {
+        server_error("mvMqttAcknowledgeMessage returned 0x%02x\n", (int) status);
+        pushMessage(OnBrokerMessageAcknowledgeFailed);
+        return;
+    }
+}
+
 void teardown_mqtt_connect() {
-    // FIXME: add clean shutdown of mqtt broker connection
     server_log("closing mqtt channel");
     broker_connected = false;
     mvCloseChannel(&mqtt_channel);
+
+    pushMessage(OnBrokerDisconnected);
+}
+
+void mqtt_disconnect() {
+    enum MvStatus status = mvMqttDisconnect(mqtt_channel);
+    if (status != MV_STATUS_OKAY) {
+        server_error("mvMqttDisconnect returned 0x%02x\n", (int) status);
+        pushMessage(OnBrokerDisconnectFailed);
+        return;
+    }
 }

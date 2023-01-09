@@ -31,6 +31,8 @@
  * FORWARD DECLARATIONS
  */
 void configure_work_notification_center();
+void process_payload(const uint8_t* topic, size_t topic_len,
+                     const uint8_t* payload, size_t payload_len);
 
 
 /*
@@ -45,6 +47,10 @@ MvNotificationHandle  work_notification_center_handle = 0;
 uint8_t work_send_buffer[BUF_SEND_SIZE] __attribute__ ((aligned(512))); // shared by config and mqtt as only one is active at a time
 uint8_t work_receive_buffer[BUF_RECEIVE_SIZE] __attribute__ ((aligned(512))); // shared by config and mqtt as only one is active at a time
 
+bool connected = false;
+bool running = true;
+float sensor_data = 1.0;
+int publish_counter = 0;
 
 /**
  * @brief Push message into work queue.
@@ -68,7 +74,7 @@ void start_work_task(void *argument) {
     
     configure_work_notification_center();
 
-	workMessageQueue = osMessageQueueNew(16, sizeof(enum MessageType), NULL);
+    workMessageQueue = osMessageQueueNew(16, sizeof(enum MessageType), NULL);
     if (workMessageQueue == NULL) {
         server_log("failed to create queue");
     }
@@ -80,8 +86,7 @@ void start_work_task(void *argument) {
     // The task's main loop
     while (1) {
         osDelay(1);
-
-		if (osMessageQueueGet(workMessageQueue, &messageType, NULL, 100U /*osWaitForever*/) == osOK) {
+        if (osMessageQueueGet(workMessageQueue, &messageType, NULL, 100U /*osWaitForever*/) == osOK) {
             server_log("event loop received a message: 0x%02x", messageType);
             switch (messageType) {
                 case ConnectNetwork:
@@ -97,6 +102,7 @@ void start_work_task(void *argument) {
                     // TODO: any teardown here?
                     break;
                 case PopulateConfig:
+                    // TODO: store config in some nonvolatile storage
                     server_log("let's obtain the config from the server now...");
                     start_configuration_fetch();
                     break;
@@ -123,34 +129,42 @@ void start_work_task(void *argument) {
                     break;
                 case OnBrokerSubscribeSucceeded:
                     server_log("subscription was successful");
-                    publish_sensor_data(21.0);
+		    connected = true;
                     break;
                 case OnBrokerSubscribeFailed:
                     server_log("subscription failed");
-                    teardown_mqtt_connect();
+                    mqtt_disconnect();
                     break;
                 case OnBrokerUnsubscribeSucceeded:
                     server_log("unsubscription was successful");
                     break;
                 case OnBrokerUnsubscribeFailed:
                     server_log("unsubscription failed");
-                    teardown_mqtt_connect();
+                    mqtt_disconnect();
                     break;
                 case OnBrokerPublishSucceeded:
                     server_log("publish was successful");
                     break;
                 case OnBrokerPublishFailed:
                     server_log("publish failed");
-                    teardown_mqtt_connect();
+                    mqtt_disconnect();
+                    break;
+                case OnBrokerMessageAcknowledgeFailed:
+                    server_log("message acknowledgement failed");
+                    mqtt_disconnect();
                     break;
                 case OnBrokerConnectFailed:
                     server_log("cleaning up mqtt broker...");
                     teardown_mqtt_connect();
                     break;
-                case OnBrokerDisconnected:
-                    // FIXME: impl
+                case OnBrokerDisconnectFailed:
+                    server_log("couldn't disconnect gracefully, closing the channel");
+                    teardown_mqtt_connect();
                     break;
-
+                case OnBrokerDisconnected:
+		    connected = false;
+                    server_log("mqtt channel closed");
+                    break;
                 case OnMQTTReadable:
                     server_log("processing mqtt connection readable event...");
                     mqtt_handle_readable_event();
@@ -160,10 +174,31 @@ void start_work_task(void *argument) {
                     mqtt_handle_connect_response_event();
                     break;
                 case OnMQTTEventMessageReceived:
-                    // FIXME: impl
+		{
+                    uint32_t correlation_id;
+                    uint8_t *payload;
+                    uint32_t payload_len;
+                    uint8_t *topic;
+                    uint32_t topic_len;
+                    uint32_t _qos;
+                    uint8_t _retain;
+                    if (mqtt_get_received_message_data(&correlation_id,
+                                                       &topic, &topic_len,
+                                                       &payload, &payload_len,
+                                                       &_qos, &_retain)) {
+                        process_payload(topic, topic_len, payload, payload_len);
+                    } else {
+                        server_log("reading mqtt message failed");
+                        mqtt_disconnect();
+                    }
+                    mqtt_acknowledge_message(correlation_id);
                     break;
+		}
                 case OnMQTTEventMessageLost:
-                    // FIXME: impl
+                    if (!mqtt_handle_lost_message_data()) {
+                        server_log("handling lost mqtt message failed");
+                        mqtt_disconnect();
+                    }
                     break;
                 case OnMQTTEventSubscribeResponse:
                     mqtt_handle_subscribe_response_event();
@@ -175,7 +210,8 @@ void start_work_task(void *argument) {
                     mqtt_handle_publish_response_event();
                     break;
                 case OnMQTTEventDisconnectResponse:
-                    // FIXME: impl
+                    server_log("Disconnected from MQTT broker gracefully");
+                    teardown_mqtt_connect();
                     break;
                 default:
                     server_error("received a message we haven't implemented yet: %d", messageType);
@@ -184,6 +220,17 @@ void start_work_task(void *argument) {
         }
 
         osDelay(100);
+	publish_counter++;
+        server_log("tick %d %d %d", running, connected, publish_counter);
+	if (running && connected && (publish_counter >= 10)) {
+	    publish_counter = 0;
+            publish_sensor_data(sensor_data);
+
+	    sensor_data += 0.1;
+	    if (sensor_data > 50.0) {
+		sensor_data = 1.0;
+	    }
+	}
     }
 }
 
@@ -212,6 +259,19 @@ void configure_work_notification_center() {
     NVIC_EnableIRQ(WORK_NOTIFICATION_IRQ);
 }
 
+void process_payload(const uint8_t* topic, size_t topic_len,
+                     const uint8_t* payload, size_t payload_len) {
+    server_log("Got a message on topic '%.*s' with payload '%.*s",
+               (int) topic_len, topic,
+               (int) payload_len, payload);
+    if (strncmp("stop", payload, payload_len) == 0) {
+        running = false;
+    }
+
+    if (strncmp("restart", payload, payload_len) == 0) {
+        running = true;
+    }
+}
 /**
  * @brief Handle network notification events
  */
