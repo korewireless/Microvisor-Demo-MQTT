@@ -97,6 +97,7 @@ The following policy configures access for:
         
         # the `Device data endpoint` hostname obtained above:
         export BROKER_HOST=xxxx.amazonaws.com
+        export BROKER_PORT=8883
 
 - The certificate data from AWS IoT is provided in PEM format, but for space considerations Microvisor needs this information in DER format so we will convert it:
 
@@ -122,7 +123,7 @@ The following policy configures access for:
                 --data-urlencode "Key=root-CA" \
                 --data-urlencode "Value=$(hexdump -v -e '1/1 "%02x"' root-ca.der)" \
                 --silent https://microvisor.twilio.com/v1/Devices/${MV_DEVICE_SID}/Configs \
-                -u ${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN} | jq .
+                -u ${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}
         
         curl --fail -X POST \
                 --data-urlencode "Key=cert" \
