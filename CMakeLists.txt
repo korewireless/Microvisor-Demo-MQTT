@@ -9,6 +9,9 @@ set(ENABLE_REMOTE_DEBUGGING 1)
 # Set to false to stop '[DEBUG]' messages being logged
 add_compile_definitions(LOG_DEBUG_MESSAGES=true)
 
+# Set application
+add_compile_definitions(APPLICATION_DUMMY)
+
 set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/toolchain.cmake")
 
 project(${PROJECT_NAME} C CXX ASM)

@@ -93,7 +93,7 @@ static void spin_network() {
         if (new_have_network != _have_network) {
             server_log("network: received status changed: %s", (new_have_network ? "connected" : "connecting"));
 
-            pushMessage(new_have_network ? OnNetworkConnected : OnNetworkDisconnected);
+            pushWorkMessage(new_have_network ? OnNetworkConnected : OnNetworkDisconnected);
         }
         _have_network = new_have_network;
     }

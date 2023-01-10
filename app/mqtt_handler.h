@@ -28,7 +28,6 @@
 extern "C" {
 #endif
 
-
 /*
  * PROTOTYPES
  */
@@ -36,7 +35,7 @@ void start_mqtt_connect();
 bool is_broker_connected();
 void start_subscriptions();
 void end_subscriptions();
-void publish_sensor_data(float temperature);
+void publish_message(const char *payload);
 void teardown_mqtt_connect();
 
 void mqtt_handle_readable_event();

@@ -11,6 +11,7 @@
 #include "uart_logging.h"
 #include "network_helper.h"
 #include "work.h"
+#include "application.h"
 
 
 /*
@@ -38,6 +39,14 @@ osThreadId_t WorkTask;
 const osThreadAttr_t work_task_attributes = {
     .name = "WorkTask",
     .stack_size = configMINIMAL_STACK_SIZE + 3072, // specified in words, size 4 for Microvisor - we do a lot of work in this thread, allocate accordingly
+    .priority = (osPriority_t) osPriorityNormal
+};
+
+// This is the CMSIS/FreeRTOS thread task that manages user application outside of communication
+osThreadId_t ApplicationTask;
+const osThreadAttr_t application_task_attributes = {
+    .name = "ApplicationTask",
+    .stack_size = configMINIMAL_STACK_SIZE, // specified in words, size 4 for Microvisor
     .priority = (osPriority_t) osPriorityNormal
 };
 
@@ -87,6 +96,8 @@ int main(void) {
     assert(WorkTask != NULL);
     NetworkTask  = osThreadNew(start_network_task,  NULL, &network_task_attributes);
     assert(NetworkTask != NULL);
+    ApplicationTask     = osThreadNew(start_application_task,     NULL, &application_task_attributes);
+    assert(ApplicationTask != NULL);
 
     // Start the scheduler
     server_log("starting scheduler...");

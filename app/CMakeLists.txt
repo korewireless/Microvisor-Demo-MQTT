@@ -22,6 +22,7 @@ add_executable(${PROJECT_NAME}
     stm32u5xx_hal_timebase_tim_template.c
     uart_logging.c
     work.c
+    application.c
 )
 
 # Link built libraries
