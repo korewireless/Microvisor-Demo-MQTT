@@ -18,6 +18,7 @@ app_dir=app
 app_name=mv-mqtt-demo.bin
 #------------^ APP SPECIFIC ^------------
 cmake_path="${app_dir}/CMakeLists.txt"
+build_number_path="${app_dir}/.build_number"
 bin_path="build/${app_dir}/${app_name}"
 private_key_path=NONE
 public_key_path=NONE
@@ -128,18 +129,14 @@ build_app() {
 }
 
 update_build_number() {
-    build_val=$(grep 'set(BUILD_NUMBER "' "${cmake_path}")
-    old_num=$(echo "${build_val}" | cut -d '"' -s -f 2)
-    ((new_num=old_num+1))
-
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        sed -i "s|BUILD_NUMBER \"${old_num}\"|BUILD_NUMBER \"${new_num}\"|" "${cmake_path}"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS requires slightly different syntax from Unix
-        sed -i '' "s|BUILD_NUMBER \"${old_num}\"|BUILD_NUMBER \"${new_num}\"|" "${cmake_path}"
+    if [ -f ${build_number_path} ]; then
+        old_num=$(<${build_number_path})
     else
-        echo "[ERROR] Unknown OS... build number not incremented"
+        old_num=0
     fi
+
+    ((new_num=old_num+1))
+    echo "$new_num" >${build_number_path}
 }
 
 # RUNTIME START
