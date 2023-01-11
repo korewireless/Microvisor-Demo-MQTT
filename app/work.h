@@ -60,6 +60,7 @@ enum WorkMessageType {
     OnBrokerUnsubscribeSucceeded,
     OnBrokerPublishFailed,
     OnBrokerPublishSucceeded,
+    OnBrokerPublishRateLimited,
     OnBrokerMessageAcknowledgeFailed,
     OnBrokerDisconnected,
     OnBrokerDisconnectFailed,

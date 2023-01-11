@@ -162,6 +162,9 @@ void start_work_task(void *argument) {
                     server_log("publish failed");
                     mqtt_disconnect();
                     break;
+                case OnBrokerPublishRateLimited:
+                    server_log("publish was rate limited");
+                    break;
                 case OnBrokerMessageAcknowledgeFailed:
                     server_log("message acknowledgement failed");
                     mqtt_disconnect();

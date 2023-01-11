@@ -220,7 +220,11 @@ void publish_message(const char* payload) {
     status = mvMqttRequestPublish(mqtt_channel, &request);
     if (status != MV_STATUS_OKAY) {
         server_error("mvMqttRequestPublish returned 0x%02x\n", (int) status);
-        pushWorkMessage(OnBrokerPublishFailed);
+        if (status == MV_STATUS_RATELIMITED) {
+            pushWorkMessage(OnBrokerPublishRateLimited);
+        } else {
+            pushWorkMessage(OnBrokerPublishFailed);
+        }
         return;
     }
     server_log("completed publish request");
