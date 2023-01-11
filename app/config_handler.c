@@ -74,8 +74,8 @@ void start_configuration_fetch() {
 
     enum MvStatus status;
     if ((status = mvOpenChannel(&ch_params, &configuration_channel)) != MV_STATUS_OKAY) {
-        // report error
         server_error("encountered error opening config channel: %x", status);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
 
@@ -115,7 +115,7 @@ void start_configuration_fetch() {
     server_log("sending config request...");
     if ((status = mvSendConfigFetchRequest(configuration_channel, &request)) != MV_STATUS_OKAY) {
         server_error("encountered an error requesting config: %x", status);
-        return;
+        pushWorkMessage(OnConfigFailed);
     }
 }
 

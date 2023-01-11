@@ -63,6 +63,7 @@ enum WorkMessageType {
     OnBrokerMessageAcknowledgeFailed,
     OnBrokerDisconnected,
     OnBrokerDisconnectFailed,
+    OnBrokerDroppedConnection,
 
     // Managed MQTT readable events to handle
     OnMQTTReadable = 0x70,

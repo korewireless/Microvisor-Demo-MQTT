@@ -46,12 +46,11 @@ MvNotificationHandle  work_notification_center_handle = 0;
 uint8_t work_send_buffer[BUF_SEND_SIZE] __attribute__ ((aligned(512))); // shared by config and mqtt as only one is active at a time
 uint8_t work_receive_buffer[BUF_RECEIVE_SIZE] __attribute__ ((aligned(512))); // shared by config and mqtt as only one is active at a time
 
-bool connected = false;
-bool running = true;
-
 bool application_processing_message = false;
-uint32_t correlation_id = 0;
-bool mqtt_message_pending = false;
+static uint32_t correlation_id = 0;
+static bool mqtt_message_pending = false;
+static bool mqtt_connection_active = false;
+static bool wait_for_config = false;
 
 uint8_t *incoming_message_topic;
 uint32_t incoming_message_topic_len;
@@ -76,6 +75,7 @@ void pushWorkMessage(enum WorkMessageType type) {
  * @param  argument: Not used.
  */
 void start_work_task(void *argument) {
+    bool network_on = false;
     server_log("starting work task...");
     
     configure_work_notification_center();
@@ -102,19 +102,23 @@ void start_work_task(void *argument) {
                     break;
                 case OnNetworkConnected:
                     server_log("we now have network");
+                    network_on = true;
                     pushWorkMessage(PopulateConfig);
                     break;
                 case OnNetworkDisconnected:
                     server_log("we lost network");
+                    network_on = false;
                     // TODO: any teardown here?
                     break;
                 case PopulateConfig:
                     // TODO: store config in some nonvolatile storage
                     server_log("let's obtain the config from the server now...");
+                    wait_for_config = true;
                     start_configuration_fetch();
                     break;
                 case OnConfigRequestReturn:
                     server_log("we received a config response, process it");
+                    wait_for_config = false;
                     receive_configuration_items();
                     break;
                 case OnConfigObtained:
@@ -123,21 +127,22 @@ void start_work_task(void *argument) {
                     pushWorkMessage(ConnectMQTTBroker);
                     break;
                 case OnConfigFailed:
-                    finish_configuration_fetch();
                     server_error("we failed to obtain the needed configuration");
+                    wait_for_config = false;
+                    finish_configuration_fetch();
                     break;
                 case ConnectMQTTBroker:
                     server_log("connecting mqtt broker...");
                     start_mqtt_connect();
                     break;
                 case OnBrokerConnected:
+                    mqtt_connection_active = true;
                     server_log("subscribing to topics...");
                     start_subscriptions();
                     break;
                 case OnBrokerSubscribeSucceeded:
-                  pushApplicationMessage(OnMqttConnected);
+                    pushApplicationMessage(OnMqttConnected);
                     server_log("subscription was successful");
-                    connected = true;
                     break;
                 case OnBrokerSubscribeFailed:
                     server_log("subscription failed");
@@ -166,13 +171,23 @@ void start_work_task(void *argument) {
                     teardown_mqtt_connect();
                     break;
                 case OnBrokerDisconnectFailed:
+                    mqtt_connection_active = false;
                     server_log("couldn't disconnect gracefully, closing the channel");
                     teardown_mqtt_connect();
                     break;
                 case OnBrokerDisconnected:
-                    connected = false;
-                  pushApplicationMessage(OnMqttDisconnected);
+                    mqtt_connection_active = false;
+                    pushApplicationMessage(OnMqttDisconnected);
                     server_log("mqtt channel closed");
+                    if (network_on) {
+                        server_log("reconnect to mqtt broker");
+                        pushWorkMessage(ConnectMQTTBroker);
+                    }
+                    break;
+                case OnBrokerDroppedConnection:
+                    mqtt_connection_active = false;
+                    teardown_mqtt_connect();
+                    server_log("mqtt channel closed by server");
                     break;
                 case OnMQTTReadable:
                     server_log("processing mqtt connection readable event...");
@@ -288,13 +303,31 @@ void TIM8_BRK_IRQHandler(void) {
 
     server_log("received channel tag %d notification event_type 0x%02x", notification.tag, notification.event_type);
     if (notification.tag == TAG_CHANNEL_CONFIG) {
-        // FIXME: differentiate event_types
-        pushWorkMessage(OnConfigRequestReturn);
-    } else if (notification.tag == TAG_CHANNEL_MQTT) {
-        if (notification.event_type == MV_EVENTTYPE_CHANNELDATAREADABLE) {
-            pushWorkMessage(OnMQTTReadable);
+        switch (notification.event_type) {
+            case MV_EVENTTYPE_CHANNELDATAREADABLE:
+                pushWorkMessage(OnConfigRequestReturn);
+                break;
+            case MV_EVENTTYPE_CHANNELNOTCONNECTED:
+                if (wait_for_config) {
+                    pushWorkMessage(OnConfigFailed);
+                }
+                break;
+            default:
+                break;
         }
-        // FIXME: handle other event_types
+    } else if (notification.tag == TAG_CHANNEL_MQTT) {
+        switch (notification.event_type) {
+            case MV_EVENTTYPE_CHANNELDATAREADABLE:
+                pushWorkMessage(OnMQTTReadable);
+                break;
+            case MV_EVENTTYPE_CHANNELNOTCONNECTED:
+                if (mqtt_connection_active) {
+                    pushWorkMessage(OnBrokerDroppedConnection);
+                }
+                break;
+            default:
+                break;
+        }
     }
 
     // Point to the next record to be written
