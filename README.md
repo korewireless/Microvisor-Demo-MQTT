@@ -159,12 +159,27 @@ This will compile, bundle and upload the code, and stage it for deployment to yo
 
 The `--log` flag initiates log-streaming.
 
+## Choosing which application to build
+
+Multiple applications are supported in the demo. Right now the two applications implemented are
+
+    - `dummy` - send dummy temperature data once a second
+    - `temperature` - send real temperature read from TH02 sensor
+
+You can choose what application to build by providing `--application` argument to `deploy.sh`
+
+```bash
+./deploy.sh --application temperature --log
+```
+
+By default `dummy` application is built.
+
 ## View Log Output
 
 You can start log streaming separately — for example, in a second terminal window — with this command:
 
 ```bash
-./deploy.sh --log-only
+./deploy.sh --logonly
 ```
 
 For more information, run

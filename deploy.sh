@@ -11,7 +11,7 @@
 # @license   MIT
 #
 
-set -x
+#set -x
 
 # GLOBALS
 app_dir=app
@@ -20,6 +20,7 @@ app_name=mv-mqtt-demo.bin
 cmake_path="${app_dir}/CMakeLists.txt"
 build_number_path="${app_dir}/.build_number"
 bin_path="build/${app_dir}/${app_name}"
+application="dummy"
 private_key_path=NONE
 public_key_path=NONE
 do_log=0
@@ -46,6 +47,7 @@ show_help() {
     echo -e "Usage:\n"
     echo -e "  ./deploy.sh /optional/path/to/Microvisor/app.bin\n"
     echo -e "Options:\n"
+    echo "  --application {path}  Set application to build. Default: dummy"
     echo "  --log / -l            After deployment, start log streaming. Default: no logging"
     echo "  --genkeys             Generate remote debugging keys"
     echo "  --publickey {path}    /path/to/remote/debugging/public/key.pem"
@@ -118,7 +120,7 @@ check_prereqs() {
 
 build_app() {
     # Set up the build
-    cmake -S . -B build
+    cmake -S . -B build -DAPPLICATION="$application"
 
     # Build the app itself
     if cmake --build build 2>&1 ; then
@@ -154,27 +156,32 @@ for arg in "$@"; do
             show_error_and_exit "Missing value for ${last_arg}"
         fi
         case "${arg_is_value}" in
-            1) private_key_path="${arg}" ;;
-            2) public_key_path="${arg}"  ;;
-            3) output_mode="${check_arg}" ;;
+            1) application="${arg}" ;;
+            2) private_key_path="${arg}" ;;
+            3) public_key_path="${arg}"  ;;
+            4) output_mode="${check_arg}" ;;
             *) echo "[Error] Unknown argument" exit 1 ;;
         esac
         arg_is_value=0
         continue
     fi
 
-    if [[ "${check_arg}" = "--log" || "${check_arg}" = "-l" ]]; then
-        do_log=1
-    elif [[ "${check_arg}" = "--privatekey" ]]; then
+    if [[ "${check_arg}" = "--application" ]]; then
         arg_is_value=1
         last_arg=${arg}
         continue
-    elif [[ "${check_arg}" = "--publickey" ]]; then
+    elif [[ "${check_arg}" = "--log" || "${check_arg}" = "-l" ]]; then
+        do_log=1
+    elif [[ "${check_arg}" = "--privatekey" ]]; then
         arg_is_value=2
         last_arg=${arg}
         continue
-    elif [[ "${check_arg}" = "--output"  || "${check_arg}" = "-o" ]]; then
+    elif [[ "${check_arg}" = "--publickey" ]]; then
         arg_is_value=3
+        last_arg=${arg}
+        continue
+    elif [[ "${check_arg}" = "--output"  || "${check_arg}" = "-o" ]]; then
+        arg_is_value=4
         last_arg=${arg}
         continue
     elif [[ "${check_arg}" = "--buildonly" || "${check_arg}" = "-b" ]]; then

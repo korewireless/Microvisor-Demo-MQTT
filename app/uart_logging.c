@@ -74,8 +74,8 @@ void HAL_UART_MspInit(UART_HandleTypeDef *uart) {
     // Pin PD5 - TX
     GPIO_InitTypeDef gpioConfig = { 0 };
     gpioConfig.Pin       = GPIO_PIN_5;              // TX pin
-    gpioConfig.Mode      = GPIO_MODE_AF_PP;         // Pin's alt function with pull...
-    gpioConfig.Pull      = GPIO_NOPULL;             // ...but don't apply a pull
+    gpioConfig.Mode      = GPIO_MODE_AF_PP;         // Push-pull mode
+    gpioConfig.Pull      = GPIO_NOPULL;             // No pull-up/pull-down
     gpioConfig.Speed     = GPIO_SPEED_FREQ_HIGH;
     gpioConfig.Alternate = GPIO_AF7_USART2;         // Select the alt function
 

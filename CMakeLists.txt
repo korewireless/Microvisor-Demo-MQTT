@@ -10,7 +10,15 @@ set(ENABLE_REMOTE_DEBUGGING 1)
 add_compile_definitions(LOG_DEBUG_MESSAGES=true)
 
 # Set application
-add_compile_definitions(APPLICATION_DUMMY)
+set(APPLICATION "dummy" CACHE STRING "application to build")
+
+if(APPLICATION STREQUAL "dummy")
+    add_compile_definitions(APPLICATION_DUMMY)
+elseif(APPLICATION STREQUAL "temperature")
+    add_compile_definitions(APPLICATION_TEMPERATURE)
+else()
+    message (FATAL_ERROR "Unknown application: ${APPLICATION}")
+endif()
 
 set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/toolchain.cmake")
 

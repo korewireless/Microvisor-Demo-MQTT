@@ -11,6 +11,10 @@
 #include "work.h"
 #include "log_helper.h"
 
+#if defined(APPLICATION_TEMPERATURE)
+#  include "i2c_helper.h"
+#endif
+
 /*
  *  FORWARD DECLARATIONS
  */
@@ -30,10 +34,27 @@ osMessageQueueId_t applicationMessageQueue;
 /*
  *  APPLICATION_SPECIFIG DATA
  */
-#ifdef APPLICATION_DUMMY
+#if defined(APPLICATION_DUMMY)
 static size_t publish_counter = 0;
 static float sensor_data = 0.0;
 static bool application_running = true;
+#elif defined(APPLICATION_TEMPERATURE)
+static size_t publish_counter = 0;
+static bool application_running = true;
+static bool i2c_initialised = true;
+
+#define TH02_ADDR 0x80
+
+#define TH02_STATUS_ADDR 0
+#define TH02_DATAH_ADDR 1
+#define TH02_CONFIG_ADDR 3
+
+#define TH02_CONFIG_START 0x01
+#define TH02_CONFIG_TEMP 0x10
+
+#define TH02_STATUS_RDY 0x01
+
+
 #endif
 /**
  * @brief Push message into application queue.
@@ -78,22 +99,22 @@ void start_application_task(void *argument) {
                 case OnIncomingMqttMessage:
                     application_process_message(incoming_message_topic,
                                                 incoming_message_topic_len,
-                                          incoming_message_payload,
-                                          incoming_message_payload_len);
-                  pushWorkMessage(OnApplicationConsumedMessage);
+                                                incoming_message_payload,
+                                                incoming_message_payload_len);
+                    pushWorkMessage(OnApplicationConsumedMessage);
                     break;
-              case OnMqttMessageSent:
-                  message_in_flight = false;
+                case OnMqttMessageSent:
+                    message_in_flight = false;
                     break;
             }
         }
 
         osDelay(100);
-       application_poll();
+        application_poll();
     }
 }
 
-#ifdef APPLICATION_DUMMY
+#if defined(APPLICATION_DUMMY)
 void application_init() {
     publish_counter = 0;
     sensor_data = 1.0;
@@ -103,16 +124,90 @@ void application_init() {
 void application_poll() {
     publish_counter++;
 
-    if (application_running && mqtt_connected && !message_in_flight && (publish_counter >= 10)) {
-        publish_counter = 0;
+    if (application_running && mqtt_connected && !message_in_flight && (publish_counter >= 2)) {
+       publish_counter = 0;
        message_in_flight = true;
 
-        sprintf(application_message_payload, "{\"temperature\":%.2f}", sensor_data);
+       sprintf(application_message_payload, "{\"temperature_celsius\":%.2f}", sensor_data);
        pushWorkMessage(OnApplicationProducedMessage);
 
        sensor_data += 0.1;
        if (sensor_data > 50.0) {
             sensor_data = 1.0;
+       }
+    }
+}
+
+void application_process_message(const uint8_t* topic, size_t topic_len,
+                                 const uint8_t* payload, size_t payload_len) {
+    server_log("Got a message on topic '%.*s' with payload '%.*s",
+               (int) topic_len, topic,
+               (int) payload_len, payload);
+    if (strncmp("stop", (char*) payload, payload_len) == 0) {
+        application_running = false;
+    }
+
+    if (strncmp("restart", (char*) payload, payload_len) == 0) {
+        application_running = true;
+    }
+}
+
+#elif defined(APPLICATION_TEMPERATURE)
+void application_init() {
+    publish_counter = 0;
+    application_running = true;
+
+    i2c_initialised = i2c_init();
+
+    if (!i2c_initialised) {
+        server_log("Failed to initialise I2C, application will not be running");
+    }
+}
+
+static bool get_temperature(float *temperature) {
+    // Read temperature from TH02 sensor, see datasheet for the procedure
+    uint8_t reg[2];
+
+    reg[0] = TH02_CONFIG_START | TH02_CONFIG_TEMP;
+    if (!i2c_write_reg(TH02_ADDR, TH02_CONFIG_ADDR, false, reg, 1)) {
+        return false;
+    }
+
+    while (true) {
+        if (!i2c_read_reg(TH02_ADDR, TH02_STATUS_ADDR, false, reg, 1)) {
+            return false;
+        }
+
+        if (!(reg[0] & TH02_STATUS_RDY)) {
+            break;
+        }
+    }
+
+    if (!i2c_read_reg(TH02_ADDR, TH02_DATAH_ADDR, false, reg, 2)) {
+        return false;
+    }
+
+    int temperature_readout = (reg[0] << 6) | (reg[1] >> 2);
+    *temperature = (((float) temperature_readout) / 32.0) - 50.0;
+
+    return true;
+}
+
+void application_poll() {
+    publish_counter++;
+
+    if (application_running && mqtt_connected && i2c_initialised && !message_in_flight && (publish_counter >= 10)) {
+       publish_counter = 0;
+       message_in_flight = true;
+
+       float temperature = 0.0;
+
+       if (get_temperature(&temperature)) {
+           server_log("Temperature is %f", temperature);
+           sprintf(application_message_payload, "{\"temperature_celsius\":%.2f}", temperature);
+           pushWorkMessage(OnApplicationProducedMessage);
+       } else {
+           server_error("Failed to read temperature from sensor");
        }
     }
 }

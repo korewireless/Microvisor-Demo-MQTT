@@ -24,6 +24,7 @@ add_executable(${PROJECT_NAME}
     uart_logging.c
     work.c
     application.c
+    i2c_helper.c
 )
 
 # Link built libraries
