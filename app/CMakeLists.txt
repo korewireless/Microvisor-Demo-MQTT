@@ -25,6 +25,7 @@ add_executable(${PROJECT_NAME}
     work.c
     application.c
     i2c_helper.c
+    switch_helper.c
 )
 
 # Link built libraries

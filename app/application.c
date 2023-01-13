@@ -15,6 +15,9 @@
 #  include "i2c_helper.h"
 #endif
 
+#if defined(APPLICATION_SWITCH)
+#  include "switch_helper.h"
+#endif
 /*
  *  FORWARD DECLARATIONS
  */
@@ -223,6 +226,77 @@ void application_process_message(const uint8_t* topic, size_t topic_len,
 
     if (strncmp("restart", (char*) payload, payload_len) == 0) {
         application_running = true;
+    }
+}
+
+#elif defined(APPLICATION_SWITCH)
+void application_init() {
+    switch_init();
+}
+
+void application_poll() {
+}
+
+static inline bool is_whitespace(char c) {
+    switch(c) {
+        case ' ':
+	case '\t':
+	case '\r':
+	case '\n':
+	    return true;
+	default:
+	    return false;
+    }
+}
+
+static inline size_t skip_whitespace(const uint8_t* str, size_t index, size_t len) {
+    for(; index < len; index++) {
+        if (!is_whitespace(str[index])) {
+            break;
+	}
+    }
+    return index;
+}
+
+void application_process_message(const uint8_t* topic, size_t topic_len,
+                                 const uint8_t* payload, size_t payload_len) {
+    server_log("Got a message on topic '%.*s' with payload '%.*s",
+               (int) topic_len, topic,
+               (int) payload_len, payload);
+
+    const char* action_str = strnstr((const char*)payload, "\"action\"", payload_len);
+    if (action_str == NULL) {
+       return;
+    }
+
+    size_t index = (size_t) (action_str - (const char*) payload);
+    index += strlen("\"action\"");
+
+    index = skip_whitespace(payload, index, payload_len);
+
+    if (index == payload_len || payload[index] != ':') {
+	return; // colon not found
+    }
+
+    index = skip_whitespace(payload, index+1, payload_len);
+
+    size_t rest_len = payload_len - index;
+    const char* close_command = "\"switch_close\"";
+    const char* open_command = "\"switch_open\"";
+    if (rest_len < strlen(open_command)) {
+        return;
+    }
+    if (strncmp(open_command, (char*) &payload[index], strlen(open_command)) == 0) {
+        switch_open();
+    }
+
+    if (rest_len < strlen(close_command)) {
+        return;
+    }
+
+    if (strncmp(close_command, (char*) &payload[index], strlen(close_command)) == 0) {
+        switch_close();
+	return;
     }
 }
 
