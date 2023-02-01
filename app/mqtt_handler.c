@@ -62,7 +62,10 @@ void start_mqtt_connect() {
 
     struct MvMqttAuthentication authentication = {
         .method = MV_MQTTAUTHENTICATIONMETHOD_NONE,
-        .username_password = NULL,
+        .username_password = {
+            .username = {NULL, 0},
+            .password = {NULL, 0}
+        }
     };
 
     struct MvSizedString device_certs[] = {
@@ -83,8 +86,8 @@ void start_mqtt_connect() {
     };
 
     struct MvOwnTlsCertificateChain device_credentials = {
-        .chain = &device_certificate,
-        .key = &key
+        .chain = device_certificate,
+        .key = key
     };
 
     struct MvSizedString ca_certs[] = {
@@ -100,8 +103,8 @@ void start_mqtt_connect() {
     };
 
     struct MvTlsCredentials tls_credentials = {
-        .cacert = &server_ca_certificate,
-        .clientcert = &device_credentials,
+        .cacert = server_ca_certificate,
+        .clientcert = device_credentials,
     };
 
     struct MvMqttConnectRequest request = {
@@ -115,7 +118,7 @@ void start_mqtt_connect() {
             .data = client,
             .length = client_len 
         },
-        .authentication = &authentication,
+        .authentication = authentication,
         .tls_credentials = &tls_credentials,
         .keepalive = 60,
         .clean_start = 0,
@@ -277,8 +280,8 @@ void mqtt_handle_connect_response_event() {
         return;
     }
 
-    server_log("connect response.status = %d", response.status);
-    if (response.status != MV_MQTTCONNECTSTATUS_CONNACKRECEIVED) {
+    server_log("connect response.request_state = %d", response.request_state);
+    if (response.request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
         // not the status we expect
         pushWorkMessage(OnBrokerConnectFailed);
         return;
@@ -390,14 +393,7 @@ void mqtt_handle_unsubscribe_response_event() {
 
 void mqtt_handle_publish_response_event() {
     server_log("received publish request response");
-    enum MvMqttRequestState request_state;
-    uint32_t correlation_id;
-    uint32_t reason_code;
-    struct MvMqttPublishResponse response = {
-        .request_state = &request_state,
-        .correlation_id = &correlation_id,
-        .reason_code = &reason_code
-    };
+    struct MvMqttPublishResponse response = { 0 };
 
     enum MvStatus status = mvMqttReadPublishResponse(mqtt_channel, &response);
     if (status != MV_STATUS_OKAY) {
@@ -406,15 +402,15 @@ void mqtt_handle_publish_response_event() {
         return;
     }
 
-    server_log("publish response.request_state = %d", request_state);
-    if (request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
+    server_log("publish response.request_state = %d", response.request_state);
+    if (response.request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
         // not the request_state we expect
         pushWorkMessage(OnBrokerPublishFailed);
         return;
     }
 
-    server_log("publish reason_code = 0x%02x", (int) reason_code);
-    if (reason_code != 0x00) {
+    server_log("publish reason_code = 0x%02x", (int) response.reason_code);
+    if (response.reason_code != 0x00) {
         // not the status we expect
         pushWorkMessage(OnBrokerPublishFailed);
         return;
