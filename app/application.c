@@ -112,7 +112,6 @@ void start_application_task(void *argument) {
             }
         }
 
-        osDelay(100);
         application_poll();
     }
 }
@@ -127,7 +126,7 @@ void application_init() {
 void application_poll() {
     publish_counter++;
 
-    if (application_running && mqtt_connected && !message_in_flight && (publish_counter >= 2)) {
+    if (application_running && mqtt_connected && !message_in_flight && (publish_counter >= 600)) { // trigger approx every 60 seconds, depending on how chatty other messages are (relying on 100ms timeout for osMessageQueueGet above)
        publish_counter = 0;
        message_in_flight = true;
 
@@ -199,7 +198,7 @@ static bool get_temperature(float *temperature) {
 void application_poll() {
     publish_counter++;
 
-    if (application_running && mqtt_connected && i2c_initialised && !message_in_flight && (publish_counter >= 10)) {
+    if (application_running && mqtt_connected && !message_in_flight && (publish_counter >= 600)) { // trigger approx every 60 seconds, depending on how chatty other messages are (relying on 100ms timeout for osMessageQueueGet above)
        publish_counter = 0;
        message_in_flight = true;
 

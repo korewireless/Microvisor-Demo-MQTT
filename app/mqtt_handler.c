@@ -280,15 +280,15 @@ void mqtt_handle_connect_response_event() {
         return;
     }
 
-    server_log("connect response.request_state = %d", response.request_state);
     if (response.request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
+        server_log("connect error: response.request_state = %d", response.request_state);
         // not the status we expect
         pushWorkMessage(OnBrokerConnectFailed);
         return;
     }
 
-    server_log("connect response.reason_code = 0x%02x", (int) response.reason_code);
     if (response.reason_code != 0x00) {
+        server_log("connect error: response.reason_code = 0x%02x", (int) response.reason_code);
         // not the status we expect
         pushWorkMessage(OnBrokerConnectFailed);
         return;

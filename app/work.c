@@ -170,7 +170,7 @@ void start_work_task(void *argument) {
                     mqtt_disconnect();
                     break;
                 case OnBrokerConnectFailed:
-                    server_log("cleaning up mqtt broker...");
+                    server_log("broker connect failed - cleaning up mqtt broker...");
                     teardown_mqtt_connect();
                     break;
                 case OnBrokerDisconnectFailed:
@@ -327,6 +327,9 @@ void TIM8_BRK_IRQHandler(void) {
                 if (mqtt_connection_active) {
                     pushWorkMessage(OnBrokerDroppedConnection);
                 }
+                break;
+            case MV_EVENTTYPE_CHANNELDATAWRITESPACE: // NOTE: this may be removed in a future kernel release
+                server_log("notice: received MV_EVENTTYPE_CHANNELDATAWRITESPACE event - throttling counter is reset");
                 break;
             default:
                 break;
