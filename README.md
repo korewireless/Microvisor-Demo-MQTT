@@ -1,10 +1,10 @@
 # Microvisor MQTT Demo 1.0.0
 
-This repo provides a basic demonstration of a user application capable of working with Microvisor’s MQTT communications system calls. It has not hardware dependencies beyond the Twilio Microvisor Nucleo Development Board.
+This repo provides a basic demonstration of a user application capable of working with Microvisor’s MQTT communications system calls. It has no hardware dependencies beyond the Twilio Microvisor Nucleo Development Board.
 
 It is based on the [FreeRTOS](https://freertos.org/) real-time operating system and which will run on the “non-secure” side of Microvisor. FreeRTOS is included as a submodule.
 
-The [ARM CMSIS-RTOS API](https://github.com/ARM-software/CMSIS_5) is used an an intermediary between the application and FreeRTOS to make it easier to swap out the RTOS layer for another.
+The [ARM CMSIS-RTOS API](https://github.com/ARM-software/CMSIS_5) is used as an intermediary between the application and FreeRTOS to make it easier to swap out the RTOS layer for another.
 
 The application code files can be found in the [app_src/](app_src/) directory. The [ST_Code/](ST_Code/) directory contains required components that are not part of Twilio Microvisor STM32U5 HAL, which this sample accesses as a submodule. The `FreeRTOSConfig.h` and `stm32u5xx_hal_conf.h` configuration files are located in the [config/](config/) directory.
 
@@ -19,7 +19,7 @@ The code creates and runs four threads:
 - A thread periodically toggles GPIO A5, which is the user LED on the [Microvisor Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board).  This acts as a heartbeat to let you know the demo is working.
 - A thread manages the network state of your application, requesting control of the network from Microvisor.
 - A work thread which consumes events and dispatches them in support of the configuration loading and managed MQTT broker operations.
-- A data collection thread which consumes data from an attached sensor (or demo source) and sends it to the work thread for publishing.
+- An application thread which consumes data from an attached sensor (or demo source) and sends it to the work thread for publishing.
 
 ## Cloning the Repo
 
@@ -159,12 +159,27 @@ This will compile, bundle and upload the code, and stage it for deployment to yo
 
 The `--log` flag initiates log-streaming.
 
+## Choosing which application to build
+
+Multiple applications are supported in the demo. Right now the two applications implemented are
+
+    - `dummy` - send dummy temperature data once a second
+    - `temperature` - send real temperature read from TH02 sensor
+
+You can choose what application to build by providing `--application` argument to `deploy.sh`
+
+```bash
+./deploy.sh --application temperature --log
+```
+
+By default `dummy` application is built.
+
 ## View Log Output
 
 You can start log streaming separately — for example, in a second terminal window — with this command:
 
 ```bash
-./deploy.sh --log-only
+./deploy.sh --logonly
 ```
 
 For more information, run

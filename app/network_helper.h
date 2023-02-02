@@ -37,8 +37,6 @@ extern "C" {
  * PROTOTYPES
  */
 void start_network_task(void *argument);
-void spin_network();
-bool have_network();
 MvNetworkHandle get_network_handle();
 
 

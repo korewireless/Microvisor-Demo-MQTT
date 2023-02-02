@@ -9,6 +9,19 @@ set(ENABLE_REMOTE_DEBUGGING 1)
 # Set to false to stop '[DEBUG]' messages being logged
 add_compile_definitions(LOG_DEBUG_MESSAGES=true)
 
+# Set application
+set(APPLICATION "dummy" CACHE STRING "application to build")
+
+if(APPLICATION STREQUAL "dummy")
+    add_compile_definitions(APPLICATION_DUMMY)
+elseif(APPLICATION STREQUAL "temperature")
+    add_compile_definitions(APPLICATION_TEMPERATURE)
+elseif(APPLICATION STREQUAL "switch")
+    add_compile_definitions(APPLICATION_SWITCH)
+else()
+    message (FATAL_ERROR "Unknown application: ${APPLICATION}")
+endif()
+
 set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/toolchain.cmake")
 
 project(${PROJECT_NAME} C CXX ASM)

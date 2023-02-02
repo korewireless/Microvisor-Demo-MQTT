@@ -74,8 +74,8 @@ void start_configuration_fetch() {
 
     enum MvStatus status;
     if ((status = mvOpenChannel(&ch_params, &configuration_channel)) != MV_STATUS_OKAY) {
-        // report error
         server_error("encountered error opening config channel: %x", status);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
 
@@ -115,7 +115,7 @@ void start_configuration_fetch() {
     server_log("sending config request...");
     if ((status = mvSendConfigFetchRequest(configuration_channel, &request)) != MV_STATUS_OKAY) {
         server_error("encountered an error requesting config: %x", status);
-        return;
+        pushWorkMessage(OnConfigFailed);
     }
 }
 
@@ -130,19 +130,19 @@ void receive_configuration_items() {
     enum MvStatus status;
     if ((status = mvReadConfigFetchResponseData(configuration_channel, &response)) != MV_STATUS_OKAY) {
         server_error("encountered an error fetching configuration response");
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
 
     if (response.result != MV_CONFIGFETCHRESULT_OK) {
         server_error("received different result from config fetch than expected: %d", response.result);
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
 
     if (response.num_items != 5) {
         server_error("received different number of items than expected 5 != %d", response.num_items);
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
 
@@ -163,12 +163,12 @@ void receive_configuration_items() {
     server_log("fetching item %d", item.item_index);
     if ((status = mvReadConfigResponseItem(configuration_channel, &item)) != MV_STATUS_OKAY) {
         server_error("error reading config item index %d - %d (MvConfigFetchResult)", item.item_index, status);
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
     if (result != MV_CONFIGKEYFETCHRESULT_OK) {
         server_error("unexpected result reading config item index %d - %d (MvConfigKeyFetchResult)", item.item_index, result);
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
     memcpy(broker_host, read_buffer, read_buffer_used);
@@ -180,12 +180,12 @@ void receive_configuration_items() {
     server_log("fetching item %d", item.item_index);
     if ((status = mvReadConfigResponseItem(configuration_channel, &item)) != MV_STATUS_OKAY) {
         server_error("error reading config item index %d - %d", item.item_index, status);
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
     if (result != MV_CONFIGKEYFETCHRESULT_OK) {
         server_error("unexpected result reading config item index %d - %d", item.item_index, result);
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
     read_buffer[read_buffer_used] = '\0';
@@ -196,7 +196,7 @@ void receive_configuration_items() {
     item.item_index = 2;
     consume_binary_success = consume_binary_config_value( &configuration_channel, &item, root_ca, BUF_ROOT_CA, &root_ca_len);
     if (!consume_binary_success) {
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
     server_log("root_ca[%d] = 0x%02x", root_ca_len-1, root_ca[root_ca_len-1]);
@@ -205,7 +205,7 @@ void receive_configuration_items() {
     item.item_index = 3;
     consume_binary_success = consume_binary_config_value( &configuration_channel, &item, cert, BUF_CERT, &cert_len);
     if (!consume_binary_success) {
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
     server_log("cert[%d] = 0x%02x", cert_len-1, cert[cert_len-1]);
@@ -213,13 +213,13 @@ void receive_configuration_items() {
     item.item_index = 4;
     consume_binary_success = consume_binary_config_value( &configuration_channel, &item, private_key, BUF_PRIVATE_KEY, &private_key_len);
     if (!consume_binary_success) {
-        pushMessage(OnConfigFailed);
+        pushWorkMessage(OnConfigFailed);
         return;
     }
     server_log("private_key[%d] = 0x%02x", private_key_len-1, private_key[private_key_len-1]);
 
 
-    pushMessage(OnConfigObtained);
+    pushWorkMessage(OnConfigObtained);
 }
 
 bool consume_binary_config_value(

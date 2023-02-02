@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.14)
 # Set application data
 set(APP "Microvisor MQTT Demo")
 set(VERSION_NUMBER "1.0.0")
-set(BUILD_NUMBER "1")
+
+file (STRINGS ".build_number" BUILD_NUMBER)
 
 message("Building ${APP} ${VERSION_NUMBER} build ${BUILD_NUMBER}")
 
@@ -22,6 +23,9 @@ add_executable(${PROJECT_NAME}
     stm32u5xx_hal_timebase_tim_template.c
     uart_logging.c
     work.c
+    application.c
+    i2c_helper.c
+    switch_helper.c
 )
 
 # Link built libraries

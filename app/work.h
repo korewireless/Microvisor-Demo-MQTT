@@ -37,7 +37,7 @@ extern "C" {
 /*
  * TYPES
  */
-enum MessageType {
+enum WorkMessageType {
     ConnectNetwork = 0x10,
     OnNetworkConnected,
     OnNetworkDisconnected,
@@ -49,6 +49,7 @@ enum MessageType {
 
     // Managed MQTT operations and connection events
     ConnectMQTTBroker = 0x50,
+    OnMqttChannelFailed,
     OnBrokerConnectFailed,
     OnBrokerConnected,
     OnBrokerSubscriptionRequestFailed,
@@ -57,10 +58,13 @@ enum MessageType {
     OnBrokerUnsubscriptionRequestFailed,
     OnBrokerUnsubscribeFailed,
     OnBrokerUnsubscribeSucceeded,
-    OnBrokerPublishRequestFailed,
     OnBrokerPublishFailed,
     OnBrokerPublishSucceeded,
+    OnBrokerPublishRateLimited,
+    OnBrokerMessageAcknowledgeFailed,
     OnBrokerDisconnected,
+    OnBrokerDisconnectFailed,
+    OnBrokerDroppedConnection,
 
     // Managed MQTT readable events to handle
     OnMQTTReadable = 0x70,
@@ -71,13 +75,17 @@ enum MessageType {
     OnMQTTEventUnsubscribeResponse,
     OnMQTTEventPublishResponse,
     OnMQTTEventDisconnectResponse,
+
+    // Application events
+    OnApplicationConsumedMessage = 0x90,
+    OnApplicationProducedMessage,
 };
   
 /*
  * PROTOTYPES
  */
 void start_work_task(void *argument);
-void pushMessage(enum MessageType type);
+void pushWorkMessage(enum WorkMessageType type);
 
 
 /*
@@ -87,6 +95,11 @@ extern MvNotificationHandle work_notification_center_handle;
 extern osMessageQueueId_t workMessageQueue;
 extern uint8_t work_send_buffer[BUF_SEND_SIZE]; // shared by config and mqtt as only one is active at a time
 extern uint8_t work_receive_buffer[BUF_RECEIVE_SIZE]; // shared by config and mqtt as only one is active at a time
+
+extern uint8_t *incoming_message_topic;
+extern uint32_t incoming_message_topic_len;
+extern uint8_t *incoming_message_payload;
+extern uint32_t incoming_message_payload_len;
 
 
 #ifdef __cplusplus

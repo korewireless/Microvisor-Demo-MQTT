@@ -17,6 +17,7 @@
 #include "network_helper.h"
 #include "config_handler.h"
 #include "mqtt_handler.h"
+#include "application.h"
 
 
 /*
@@ -30,8 +31,8 @@
 /*
  * FORWARD DECLARATIONS
  */
-void configure_work_notification_center();
-
+static void configure_work_notification_center();
+static bool get_mqtt_message();
 
 /*
  * STORAGE
@@ -45,13 +46,23 @@ MvNotificationHandle  work_notification_center_handle = 0;
 uint8_t work_send_buffer[BUF_SEND_SIZE] __attribute__ ((aligned(512))); // shared by config and mqtt as only one is active at a time
 uint8_t work_receive_buffer[BUF_RECEIVE_SIZE] __attribute__ ((aligned(512))); // shared by config and mqtt as only one is active at a time
 
+bool application_processing_message = false;
+static uint32_t correlation_id = 0;
+static bool mqtt_message_pending = false;
+static bool mqtt_connection_active = false;
+static bool wait_for_config = false;
+
+uint8_t *incoming_message_topic;
+uint32_t incoming_message_topic_len;
+uint8_t *incoming_message_payload;
+uint32_t incoming_message_payload_len;
 
 /**
  * @brief Push message into work queue.
  *
- * @param  type: MessageType enumeration value
+ * @param  type: WorkMessageType enumeration value
  */
-void pushMessage(enum MessageType type) {
+void pushWorkMessage(enum WorkMessageType type) {
     osStatus_t status;
     if ((status = osMessageQueuePut(workMessageQueue, &type, 0U, 0U)) != osOK) { // osWaitForever might be better for some messages?
         server_log("failed to post message: %ld", status);
@@ -64,24 +75,25 @@ void pushMessage(enum MessageType type) {
  * @param  argument: Not used.
  */
 void start_work_task(void *argument) {
+    bool network_on = false;
     server_log("starting work task...");
     
     configure_work_notification_center();
 
-	workMessageQueue = osMessageQueueNew(16, sizeof(enum MessageType), NULL);
+    workMessageQueue = osMessageQueueNew(16, sizeof(enum WorkMessageType), NULL);
     if (workMessageQueue == NULL) {
         server_log("failed to create queue");
+        return;
     }
 
-    pushMessage(ConnectNetwork);
+    pushWorkMessage(ConnectNetwork);
     
-    enum MessageType messageType;
+    enum WorkMessageType messageType;
     
     // The task's main loop
     while (1) {
         osDelay(1);
-
-		if (osMessageQueueGet(workMessageQueue, &messageType, NULL, 100U /*osWaitForever*/) == osOK) {
+        if (osMessageQueueGet(workMessageQueue, &messageType, NULL, 100U /*osWaitForever*/) == osOK) {
             server_log("event loop received a message: 0x%02x", messageType);
             switch (messageType) {
                 case ConnectNetwork:
@@ -90,67 +102,96 @@ void start_work_task(void *argument) {
                     break;
                 case OnNetworkConnected:
                     server_log("we now have network");
-                    pushMessage(PopulateConfig);
+                    network_on = true;
+                    pushWorkMessage(PopulateConfig);
                     break;
                 case OnNetworkDisconnected:
                     server_log("we lost network");
+                    network_on = false;
                     // TODO: any teardown here?
                     break;
                 case PopulateConfig:
+                    // TODO: store config in some nonvolatile storage
                     server_log("let's obtain the config from the server now...");
+                    wait_for_config = true;
                     start_configuration_fetch();
                     break;
                 case OnConfigRequestReturn:
                     server_log("we received a config response, process it");
+                    wait_for_config = false;
                     receive_configuration_items();
                     break;
                 case OnConfigObtained:
                     finish_configuration_fetch();
                     server_log("obtained configuration from server");
-                    pushMessage(ConnectMQTTBroker);
+                    pushWorkMessage(ConnectMQTTBroker);
                     break;
                 case OnConfigFailed:
-                    finish_configuration_fetch();
                     server_error("we failed to obtain the needed configuration");
+                    wait_for_config = false;
+                    finish_configuration_fetch();
                     break;
                 case ConnectMQTTBroker:
                     server_log("connecting mqtt broker...");
                     start_mqtt_connect();
                     break;
                 case OnBrokerConnected:
+                    mqtt_connection_active = true;
                     server_log("subscribing to topics...");
                     start_subscriptions();
                     break;
                 case OnBrokerSubscribeSucceeded:
+                    pushApplicationMessage(OnMqttConnected);
                     server_log("subscription was successful");
-                    publish_sensor_data(21.0);
                     break;
                 case OnBrokerSubscribeFailed:
                     server_log("subscription failed");
-                    teardown_mqtt_connect();
+                    mqtt_disconnect();
                     break;
                 case OnBrokerUnsubscribeSucceeded:
                     server_log("unsubscription was successful");
                     break;
                 case OnBrokerUnsubscribeFailed:
                     server_log("unsubscription failed");
-                    teardown_mqtt_connect();
+                    mqtt_disconnect();
                     break;
                 case OnBrokerPublishSucceeded:
                     server_log("publish was successful");
                     break;
                 case OnBrokerPublishFailed:
                     server_log("publish failed");
-                    teardown_mqtt_connect();
+                    mqtt_disconnect();
+                    break;
+                case OnBrokerPublishRateLimited:
+                    server_log("publish was rate limited");
+                    break;
+                case OnBrokerMessageAcknowledgeFailed:
+                    server_log("message acknowledgement failed");
+                    mqtt_disconnect();
                     break;
                 case OnBrokerConnectFailed:
-                    server_log("cleaning up mqtt broker...");
+                    server_log("broker connect failed - cleaning up mqtt broker...");
+                    teardown_mqtt_connect();
+                    break;
+                case OnBrokerDisconnectFailed:
+                    mqtt_connection_active = false;
+                    server_log("couldn't disconnect gracefully, closing the channel");
                     teardown_mqtt_connect();
                     break;
                 case OnBrokerDisconnected:
-                    // FIXME: impl
+                    mqtt_connection_active = false;
+                    pushApplicationMessage(OnMqttDisconnected);
+                    server_log("mqtt channel closed");
+                    if (network_on) {
+                        server_log("reconnect to mqtt broker");
+                        pushWorkMessage(ConnectMQTTBroker);
+                    }
                     break;
-
+                case OnBrokerDroppedConnection:
+                    mqtt_connection_active = false;
+                    teardown_mqtt_connect();
+                    server_log("mqtt channel closed by server");
+                    break;
                 case OnMQTTReadable:
                     server_log("processing mqtt connection readable event...");
                     mqtt_handle_readable_event();
@@ -160,10 +201,23 @@ void start_work_task(void *argument) {
                     mqtt_handle_connect_response_event();
                     break;
                 case OnMQTTEventMessageReceived:
-                    // FIXME: impl
+                    if (application_processing_message) {
+                        mqtt_message_pending = true;
+                    } else {
+                        application_processing_message = false;
+                        if(!get_mqtt_message()) {
+                            server_log("reading mqtt message failed");
+                            mqtt_disconnect();
+                        } else {
+                            pushApplicationMessage(OnIncomingMqttMessage);
+                        }
+                    }
                     break;
                 case OnMQTTEventMessageLost:
-                    // FIXME: impl
+                    if (!mqtt_handle_lost_message_data()) {
+                        server_log("handling lost mqtt message failed");
+                        mqtt_disconnect();
+                    }
                     break;
                 case OnMQTTEventSubscribeResponse:
                     mqtt_handle_subscribe_response_event();
@@ -175,15 +229,37 @@ void start_work_task(void *argument) {
                     mqtt_handle_publish_response_event();
                     break;
                 case OnMQTTEventDisconnectResponse:
-                    // FIXME: impl
+                    server_log("Disconnected from MQTT broker gracefully");
+                    teardown_mqtt_connect();
                     break;
+                case OnApplicationConsumedMessage:
+                    if(application_processing_message) {
+                        mqtt_acknowledge_message(correlation_id);
+
+                        if (mqtt_message_pending) {
+                            mqtt_message_pending = false;
+                            if(!get_mqtt_message()) {
+                                server_log("reading mqtt message failed");
+                                mqtt_disconnect();
+                            } else {
+                                pushApplicationMessage(OnIncomingMqttMessage);
+                            }
+                        } else {
+                            application_processing_message = false;
+                     }
+                    }
+                  break;
+
+                case OnApplicationProducedMessage:
+                  publish_message(application_message_payload);
+                    pushApplicationMessage(OnMqttMessageSent);
+                  break;
+
                 default:
                     server_error("received a message we haven't implemented yet: %d", messageType);
                     break;
             }
         }
-
-        osDelay(100);
     }
 }
 
@@ -212,6 +288,16 @@ void configure_work_notification_center() {
     NVIC_EnableIRQ(WORK_NOTIFICATION_IRQ);
 }
 
+bool get_mqtt_message() {
+    uint32_t _qos;
+    uint8_t _retain;
+    return mqtt_get_received_message_data(&correlation_id,
+                                          &incoming_message_topic, &incoming_message_topic_len,
+                                          &incoming_message_payload, &incoming_message_payload_len,
+                                          &_qos, &_retain);
+ 
+}
+
 /**
  * @brief Handle network notification events
  */
@@ -220,13 +306,34 @@ void TIM8_BRK_IRQHandler(void) {
 
     server_log("received channel tag %d notification event_type 0x%02x", notification.tag, notification.event_type);
     if (notification.tag == TAG_CHANNEL_CONFIG) {
-        // FIXME: differentiate event_types
-        pushMessage(OnConfigRequestReturn);
-    } else if (notification.tag == TAG_CHANNEL_MQTT) {
-        if (notification.event_type == MV_EVENTTYPE_CHANNELDATAREADABLE) {
-            pushMessage(OnMQTTReadable);
+        switch (notification.event_type) {
+            case MV_EVENTTYPE_CHANNELDATAREADABLE:
+                pushWorkMessage(OnConfigRequestReturn);
+                break;
+            case MV_EVENTTYPE_CHANNELNOTCONNECTED:
+                if (wait_for_config) {
+                    pushWorkMessage(OnConfigFailed);
+                }
+                break;
+            default:
+                break;
         }
-        // FIXME: handle other event_types
+    } else if (notification.tag == TAG_CHANNEL_MQTT) {
+        switch (notification.event_type) {
+            case MV_EVENTTYPE_CHANNELDATAREADABLE:
+                pushWorkMessage(OnMQTTReadable);
+                break;
+            case MV_EVENTTYPE_CHANNELNOTCONNECTED:
+                if (mqtt_connection_active) {
+                    pushWorkMessage(OnBrokerDroppedConnection);
+                }
+                break;
+            case MV_EVENTTYPE_CHANNELDATAWRITESPACE: // NOTE: this may be removed in a future kernel release
+                server_log("notice: received MV_EVENTTYPE_CHANNELDATAWRITESPACE event - throttling counter is reset");
+                break;
+            default:
+                break;
+        }
     }
 
     // Point to the next record to be written
