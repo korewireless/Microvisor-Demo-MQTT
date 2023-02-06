@@ -69,7 +69,7 @@ void do_log(bool is_err, char* format_string, va_list args) {
     // Do we output via UART too?
     if (uart_available) {
         // Add NEWLINE to the message and output to UART
-        sprintf(&buffer[strlen(buffer)], "\n"); // FIXME: make this safe
+        buffer[sizeof(buffer) < strlen(buffer) ? sizeof(buffer)-1 : strlen(buffer)] = '\n';
         UART_output((uint8_t*)buffer, strlen(buffer));
     }
 }

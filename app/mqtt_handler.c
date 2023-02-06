@@ -201,7 +201,7 @@ void end_subscriptions() {
 
 void publish_message(const char* payload) {
     char topic_str[128];
-    sprintf(topic_str, "sensor/device/%.*s", client_len, client); // For AWS, requires policy to allow publish access to "arn:aws:iot:us-west-2:____:topic/sensor/device/<<DEVICE_SID>>"
+    sprintf(topic_str, "sensor/device/%.*s", client_len, client); // For AWS, requires policy to allow publish access to "arn:aws:iot:<<region>>:<<account>>:topic/sensor/device/<<DEVICE_SID>>"
 
     enum MvStatus status;
 
@@ -219,7 +219,6 @@ void publish_message(const char* payload) {
         .retain = 0
     };
 
-    server_log("starting publish request");
     status = mvMqttRequestPublish(mqtt_channel, &request);
     if (status != MV_STATUS_OKAY) {
         server_error("mvMqttRequestPublish returned 0x%02x\n", (int) status);
@@ -230,8 +229,8 @@ void publish_message(const char* payload) {
         }
         return;
     }
-    server_log("completed publish request");
 
+    server_log("published to %s", topic_str);
 }
 
 void mqtt_handle_readable_event() {
@@ -241,7 +240,6 @@ void mqtt_handle_readable_event() {
         return;
     }
 
-    server_log("mqtt readable %02x", readableDataType);
     switch (readableDataType) {
         case MV_MQTTREADABLEDATATYPE_CONNECTRESPONSE: //< Response to a connect request is available.
             pushWorkMessage(OnMQTTEventConnectResponse);
@@ -281,14 +279,14 @@ void mqtt_handle_connect_response_event() {
     }
 
     if (response.request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
-        server_log("connect error: response.request_state = %d", response.request_state);
+        server_error("connect error: response.request_state = %d", response.request_state);
         // not the status we expect
         pushWorkMessage(OnBrokerConnectFailed);
         return;
     }
 
     if (response.reason_code != 0x00) {
-        server_log("connect error: response.reason_code = 0x%02x", (int) response.reason_code);
+        server_error("connect error: response.reason_code = 0x%02x", (int) response.reason_code);
         // not the status we expect
         pushWorkMessage(OnBrokerConnectFailed);
         return;
@@ -319,29 +317,28 @@ void mqtt_handle_subscribe_response_event() {
         return;
     }
 
-    server_log("subscribe response.request_state = %d", request_state);
     if (request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
         // not the request_state we expect
+        server_error("subscribe response.request_state = %d", request_state);
         pushWorkMessage(OnBrokerSubscribeFailed);
         return;
     }
 
     if (reason_codes_len != temp_num_items) {
-        server_log("expected %d subscribe reason_codes but received %d", temp_num_items, reason_codes_len);
+        server_error("expected %d subscribe reason_codes but received %d", temp_num_items, reason_codes_len);
         pushWorkMessage(OnBrokerSubscribeFailed);
         return;
     }
 
     for (uint32_t ndx=0; ndx<temp_num_items; ndx++) {
-        server_log("subscribe reason_codes[%d] = 0x%02x", ndx, (int) reason_codes[ndx]);
         if (reason_codes[ndx] != 0x00) {
             // not the status we expect
+            server_error("subscribe reason_codes[%d] = 0x%02x", ndx, (int) reason_codes[ndx]);
             pushWorkMessage(OnBrokerSubscribeFailed);
             return;
         }
     }
 
-    server_log("mqtt subscribe successful");
     pushWorkMessage(OnBrokerSubscribeSucceeded);
 }
 
@@ -365,34 +362,32 @@ void mqtt_handle_unsubscribe_response_event() {
         return;
     }
 
-    server_log("unsubscribe response.request_state = %d", request_state);
     if (request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
         // not the request_state we expect
+        server_error("unsubscribe response.request_state = %d", request_state);
         pushWorkMessage(OnBrokerUnsubscribeFailed);
         return;
     }
 
     if (reason_codes_len != temp_num_items) {
-        server_log("expected %d unsubscribe reason_codes but received %d", temp_num_items, reason_codes_len);
+        server_error("expected %d unsubscribe reason_codes but received %d", temp_num_items, reason_codes_len);
         pushWorkMessage(OnBrokerUnsubscribeFailed);
         return;
     }
 
     for (uint32_t ndx=0; ndx<temp_num_items; ndx++) {
-        server_log("unsubscribe reason_codes[%d] = 0x%02x", ndx, (int) reason_codes[ndx]);
         if (reason_codes[ndx] != 0x00) {
             // not the status we expect
+            server_error("unsubscribe reason_codes[%d] = 0x%02x", ndx, (int) reason_codes[ndx]);
             pushWorkMessage(OnBrokerUnsubscribeFailed);
             return;
         }
     }
 
-    server_log("mqtt unsubscribe successful");
     pushWorkMessage(OnBrokerUnsubscribeSucceeded);
 }
 
 void mqtt_handle_publish_response_event() {
-    server_log("received publish request response");
     struct MvMqttPublishResponse response = { 0 };
 
     enum MvStatus status = mvMqttReadPublishResponse(mqtt_channel, &response);
@@ -402,21 +397,20 @@ void mqtt_handle_publish_response_event() {
         return;
     }
 
-    server_log("publish response.request_state = %d", response.request_state);
     if (response.request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
         // not the request_state we expect
+        server_error("publish response.request_state = %d", response.request_state);
         pushWorkMessage(OnBrokerPublishFailed);
         return;
     }
 
-    server_log("publish reason_code = 0x%02x", (int) response.reason_code);
     if (response.reason_code != 0x00) {
         // not the status we expect
+        server_error("publish reason_code = 0x%02x", (int) response.reason_code);
         pushWorkMessage(OnBrokerPublishFailed);
         return;
     }
 
-    server_log("mqtt publish successful");
     pushWorkMessage(OnBrokerPublishSucceeded);
 }
 
@@ -424,7 +418,6 @@ bool mqtt_get_received_message_data(uint32_t *correlation_id,
                                     uint8_t **topic, uint32_t *topic_len,
                                     uint8_t **payload, uint32_t *payload_len,
                                     uint32_t *qos, uint8_t *retain) {
-    server_log("received mqtt message");
     struct MvMqttMessage message = {
         .correlation_id = correlation_id,
         .topic = {
@@ -454,7 +447,6 @@ bool mqtt_get_received_message_data(uint32_t *correlation_id,
 }
 
 bool mqtt_handle_lost_message_data() {
-    server_log("received mqtt dropped message notification");
     enum MvMqttLostMessageReason reason;
     uint32_t topic_len;
     uint32_t message_len;

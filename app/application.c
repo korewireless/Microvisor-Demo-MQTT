@@ -35,14 +35,14 @@ static bool message_in_flight = false;
 osMessageQueueId_t applicationMessageQueue;
 
 /*
- *  APPLICATION_SPECIFIG DATA
+ *  APPLICATION_SPECIFIC DATA
  */
 #if defined(APPLICATION_DUMMY)
-static size_t publish_counter = 0;
+static uint64_t last_send_microsec = 0;
 static float sensor_data = 0.0;
 static bool application_running = true;
 #elif defined(APPLICATION_TEMPERATURE)
-static size_t publish_counter = 0;
+static uint64_t last_send_microsec = 0;
 static bool application_running = true;
 static bool i2c_initialised = true;
 
@@ -56,9 +56,8 @@ static bool i2c_initialised = true;
 #define TH02_CONFIG_TEMP 0x10
 
 #define TH02_STATUS_RDY 0x01
-
-
 #endif
+
 /**
  * @brief Push message into application queue.
  *
@@ -67,7 +66,7 @@ static bool i2c_initialised = true;
 void pushApplicationMessage(enum ApplicationMessageType type) {
     osStatus_t status;
     if ((status = osMessageQueuePut(applicationMessageQueue, &type, 0U, 0U)) != osOK) {
-        server_log("failed to post application message: %ld", status);
+        server_error("failed to post application message: %ld", status);
     }
 }
 
@@ -77,10 +76,9 @@ void pushApplicationMessage(enum ApplicationMessageType type) {
  * @param  argument: Not used.
  */
 void start_application_task(void *argument) {
-    server_log("starting application task...");
     applicationMessageQueue = osMessageQueueNew(16, sizeof(enum ApplicationMessageType), NULL);
     if (applicationMessageQueue == NULL) {
-        server_log("failed to create queue");
+        server_error("failed to create queue");
         return;
     }
 
@@ -91,7 +89,7 @@ void start_application_task(void *argument) {
     // The task's main loop
     while (1) {
         if (osMessageQueueGet(applicationMessageQueue, &messageType, NULL, 100U ) == osOK) {
-            server_log("application event loop received a message: 0x%02x", messageType);
+            // server_log("application event loop received a message: 0x%02x", messageType);
             switch (messageType) {
                 case OnMqttConnected:
                     mqtt_connected = true;
@@ -118,16 +116,17 @@ void start_application_task(void *argument) {
 
 #if defined(APPLICATION_DUMMY)
 void application_init() {
-    publish_counter = 0;
+    last_send_microsec = 0;
     sensor_data = 1.0;
     application_running = true;
 }
 
 void application_poll() {
-    publish_counter++;
+    uint64_t current_microsec = 0;
+    mvGetMicroseconds(&current_microsec);
 
-    if (application_running && mqtt_connected && !message_in_flight && (publish_counter >= 600)) { // trigger approx every 60 seconds, depending on how chatty other messages are (relying on 100ms timeout for osMessageQueueGet above)
-       publish_counter = 0;
+    if (application_running && mqtt_connected && !message_in_flight && ((current_microsec - last_send_microsec) > 60*1000*1000)) { // trigger approx every 60 seconds, depending on how chatty other messages are (relying on 100ms timeout for osMessageQueueGet above)
+       last_send_microsec = current_microsec;
        message_in_flight = true;
 
        sprintf(application_message_payload, "{\"temperature_celsius\":%.2f}", sensor_data);
@@ -142,9 +141,9 @@ void application_poll() {
 
 void application_process_message(const uint8_t* topic, size_t topic_len,
                                  const uint8_t* payload, size_t payload_len) {
-    server_log("Got a message on topic '%.*s' with payload '%.*s",
-               (int) topic_len, topic,
-               (int) payload_len, payload);
+    // server_log("Got a message on topic '%.*s' with payload '%.*s",
+    //            (int) topic_len, topic,
+    //            (int) payload_len, payload);
     if (strncmp("stop", (char*) payload, payload_len) == 0) {
         application_running = false;
     }
@@ -156,13 +155,13 @@ void application_process_message(const uint8_t* topic, size_t topic_len,
 
 #elif defined(APPLICATION_TEMPERATURE)
 void application_init() {
-    publish_counter = 0;
+    last_send_microsec = 0;
     application_running = true;
 
     i2c_initialised = i2c_init();
 
     if (!i2c_initialised) {
-        server_log("Failed to initialise I2C, application will not be running");
+        server_error("Failed to initialise I2C, application will not be running");
     }
 }
 
@@ -196,16 +195,17 @@ static bool get_temperature(float *temperature) {
 }
 
 void application_poll() {
-    publish_counter++;
+    uint64_t current_microsec = 0;
+    mvGetMicroseconds(&current_microsec);
 
-    if (application_running && mqtt_connected && !message_in_flight && (publish_counter >= 600)) { // trigger approx every 60 seconds, depending on how chatty other messages are (relying on 100ms timeout for osMessageQueueGet above)
-       publish_counter = 0;
+    if (application_running && mqtt_connected && !message_in_flight && ((current_microsec - last_send_microsec) > 60*1000*1000)) { // trigger approx every 60 seconds, depending on how chatty other messages are (relying on 100ms timeout for osMessageQueueGet above)
+       last_send_microsec = current_microsec;
        message_in_flight = true;
 
        float temperature = 0.0;
 
        if (get_temperature(&temperature)) {
-           server_log("Temperature is %f", temperature);
+           // server_log("Temperature is %f", temperature);
            sprintf(application_message_payload, "{\"temperature_celsius\":%.2f}", temperature);
            pushWorkMessage(OnApplicationProducedMessage);
        } else {
@@ -216,9 +216,9 @@ void application_poll() {
 
 void application_process_message(const uint8_t* topic, size_t topic_len,
                                  const uint8_t* payload, size_t payload_len) {
-    server_log("Got a message on topic '%.*s' with payload '%.*s",
-               (int) topic_len, topic,
-               (int) payload_len, payload);
+    // server_log("Got a message on topic '%.*s' with payload '%.*s",
+    //            (int) topic_len, topic,
+    //            (int) payload_len, payload);
     if (strncmp("stop", (char*) payload, payload_len) == 0) {
         application_running = false;
     }
@@ -259,9 +259,9 @@ static inline size_t skip_whitespace(const uint8_t* str, size_t index, size_t le
 
 void application_process_message(const uint8_t* topic, size_t topic_len,
                                  const uint8_t* payload, size_t payload_len) {
-    server_log("Got a message on topic '%.*s' with payload '%.*s",
-               (int) topic_len, topic,
-               (int) payload_len, payload);
+    // server_log("Got a message on topic '%.*s' with payload '%.*s",
+    //            (int) topic_len, topic,
+    //            (int) payload_len, payload);
 
     const char* action_str = strnstr((const char*)payload, "\"action\"", payload_len);
     if (action_str == NULL) {

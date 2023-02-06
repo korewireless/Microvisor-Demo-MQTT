@@ -65,7 +65,7 @@ uint32_t incoming_message_payload_len;
 void pushWorkMessage(enum WorkMessageType type) {
     osStatus_t status;
     if ((status = osMessageQueuePut(workMessageQueue, &type, 0U, 0U)) != osOK) { // osWaitForever might be better for some messages?
-        server_log("failed to post message: %ld", status);
+        server_error("failed to post message: %ld", status);
     }
 }
 
@@ -76,13 +76,12 @@ void pushWorkMessage(enum WorkMessageType type) {
  */
 void start_work_task(void *argument) {
     bool network_on = false;
-    server_log("starting work task...");
     
     configure_work_notification_center();
 
     workMessageQueue = osMessageQueueNew(16, sizeof(enum WorkMessageType), NULL);
     if (workMessageQueue == NULL) {
-        server_log("failed to create queue");
+        server_error("failed to create queue");
         return;
     }
 
@@ -93,37 +92,28 @@ void start_work_task(void *argument) {
     // The task's main loop
     while (1) {
         osDelay(1);
-        if (osMessageQueueGet(workMessageQueue, &messageType, NULL, 100U /*osWaitForever*/) == osOK) {
-            server_log("event loop received a message: 0x%02x", messageType);
+        if (osMessageQueueGet(workMessageQueue, &messageType, NULL, osWaitForever) == osOK) {
             switch (messageType) {
                 case ConnectNetwork:
-                    server_log("connecting network...");
                     want_network = true;
                     break;
                 case OnNetworkConnected:
-                    server_log("we now have network");
                     network_on = true;
                     pushWorkMessage(PopulateConfig);
                     break;
                 case OnNetworkDisconnected:
-                    server_log("we lost network");
                     network_on = false;
-                    // TODO: any teardown here?
                     break;
                 case PopulateConfig:
-                    // TODO: store config in some nonvolatile storage
-                    server_log("let's obtain the config from the server now...");
                     wait_for_config = true;
                     start_configuration_fetch();
                     break;
                 case OnConfigRequestReturn:
-                    server_log("we received a config response, process it");
                     wait_for_config = false;
                     receive_configuration_items();
                     break;
                 case OnConfigObtained:
                     finish_configuration_fetch();
-                    server_log("obtained configuration from server");
                     pushWorkMessage(ConnectMQTTBroker);
                     break;
                 case OnConfigFailed:
@@ -132,56 +122,50 @@ void start_work_task(void *argument) {
                     finish_configuration_fetch();
                     break;
                 case ConnectMQTTBroker:
-                    server_log("connecting mqtt broker...");
                     start_mqtt_connect();
                     break;
                 case OnBrokerConnected:
                     mqtt_connection_active = true;
-                    server_log("subscribing to topics...");
                     start_subscriptions();
                     break;
                 case OnBrokerSubscribeSucceeded:
                     pushApplicationMessage(OnMqttConnected);
-                    server_log("subscription was successful");
                     break;
                 case OnBrokerSubscribeFailed:
-                    server_log("subscription failed");
+                    server_error("subscription failed");
                     mqtt_disconnect();
                     break;
                 case OnBrokerUnsubscribeSucceeded:
-                    server_log("unsubscription was successful");
                     break;
                 case OnBrokerUnsubscribeFailed:
-                    server_log("unsubscription failed");
+                    server_error("unsubscription failed");
                     mqtt_disconnect();
                     break;
                 case OnBrokerPublishSucceeded:
-                    server_log("publish was successful");
                     break;
                 case OnBrokerPublishFailed:
-                    server_log("publish failed");
+                    server_error("publish failed");
                     mqtt_disconnect();
                     break;
                 case OnBrokerPublishRateLimited:
-                    server_log("publish was rate limited");
+                    server_error("publish was rate limited");
                     break;
                 case OnBrokerMessageAcknowledgeFailed:
-                    server_log("message acknowledgement failed");
+                    server_error("message acknowledgement failed");
                     mqtt_disconnect();
                     break;
                 case OnBrokerConnectFailed:
-                    server_log("broker connect failed - cleaning up mqtt broker...");
+                    server_error("broker connect failed - cleaning up mqtt broker...");
                     teardown_mqtt_connect();
                     break;
                 case OnBrokerDisconnectFailed:
                     mqtt_connection_active = false;
-                    server_log("couldn't disconnect gracefully, closing the channel");
+                    server_error("couldn't disconnect gracefully, closing the channel");
                     teardown_mqtt_connect();
                     break;
                 case OnBrokerDisconnected:
                     mqtt_connection_active = false;
                     pushApplicationMessage(OnMqttDisconnected);
-                    server_log("mqtt channel closed");
                     if (network_on) {
                         server_log("reconnect to mqtt broker");
                         pushWorkMessage(ConnectMQTTBroker);
@@ -193,11 +177,9 @@ void start_work_task(void *argument) {
                     server_log("mqtt channel closed by server");
                     break;
                 case OnMQTTReadable:
-                    server_log("processing mqtt connection readable event...");
                     mqtt_handle_readable_event();
                     break;
                 case OnMQTTEventConnectResponse:
-                    server_log("processing mqtt connection response event...");
                     mqtt_handle_connect_response_event();
                     break;
                 case OnMQTTEventMessageReceived:
@@ -206,7 +188,7 @@ void start_work_task(void *argument) {
                     } else {
                         application_processing_message = false;
                         if(!get_mqtt_message()) {
-                            server_log("reading mqtt message failed");
+                            server_error("reading mqtt message failed");
                             mqtt_disconnect();
                         } else {
                             pushApplicationMessage(OnIncomingMqttMessage);
@@ -215,7 +197,7 @@ void start_work_task(void *argument) {
                     break;
                 case OnMQTTEventMessageLost:
                     if (!mqtt_handle_lost_message_data()) {
-                        server_log("handling lost mqtt message failed");
+                        server_error("handling lost mqtt message failed");
                         mqtt_disconnect();
                     }
                     break;
@@ -229,7 +211,6 @@ void start_work_task(void *argument) {
                     mqtt_handle_publish_response_event();
                     break;
                 case OnMQTTEventDisconnectResponse:
-                    server_log("Disconnected from MQTT broker gracefully");
                     teardown_mqtt_connect();
                     break;
                 case OnApplicationConsumedMessage:
@@ -239,7 +220,7 @@ void start_work_task(void *argument) {
                         if (mqtt_message_pending) {
                             mqtt_message_pending = false;
                             if(!get_mqtt_message()) {
-                                server_log("reading mqtt message failed");
+                                server_error("reading mqtt message failed");
                                 mqtt_disconnect();
                             } else {
                                 pushApplicationMessage(OnIncomingMqttMessage);
@@ -252,7 +233,7 @@ void start_work_task(void *argument) {
 
                 case OnApplicationProducedMessage:
                   publish_message(application_message_payload);
-                    pushApplicationMessage(OnMqttMessageSent);
+                  pushApplicationMessage(OnMqttMessageSent);
                   break;
 
                 default:
@@ -304,7 +285,6 @@ bool get_mqtt_message() {
 void TIM8_BRK_IRQHandler(void) {
     volatile struct MvNotification notification = work_notification_buffer[current_work_notification_index];
 
-    server_log("received channel tag %d notification event_type 0x%02x", notification.tag, notification.event_type);
     if (notification.tag == TAG_CHANNEL_CONFIG) {
         switch (notification.event_type) {
             case MV_EVENTTYPE_CHANNELDATAREADABLE:
@@ -329,7 +309,6 @@ void TIM8_BRK_IRQHandler(void) {
                 }
                 break;
             case MV_EVENTTYPE_CHANNELDATAWRITESPACE: // NOTE: this may be removed in a future kernel release
-                server_log("notice: received MV_EVENTTYPE_CHANNELDATAWRITESPACE event - throttling counter is reset");
                 break;
             default:
                 break;

@@ -62,7 +62,6 @@ static bool have_network();
  */
 void start_network_task(void *argument) {
     uint32_t last_tick = 0;
-    server_log("starting network task...");
 
     want_network = true;
 
@@ -152,8 +151,6 @@ void release_network() {
  * @brief Obtain network handle and configure a notification center for networking events.
  */
 static void configure_network() {
-    server_log("configuring network...");
-
     want_network = true;
 
     if (network_handle != 0) { // we already have a conection handle, drop out

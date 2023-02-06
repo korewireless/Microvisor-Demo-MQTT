@@ -89,7 +89,6 @@ int main(void) {
     osKernelInitialize();
 
     // Create the FreeRTOS thread(s)
-    server_log("starting tasks...");
     LEDTask      = osThreadNew(start_led_task,      NULL, &led_task_attributes);
     assert(LEDTask != NULL);
     WorkTask     = osThreadNew(start_work_task,     NULL, &work_task_attributes);
@@ -100,7 +99,6 @@ int main(void) {
     assert(ApplicationTask != NULL);
 
     // Start the scheduler
-    server_log("starting scheduler...");
     osKernelStart();
 
     // We should never get here as control is now taken by the scheduler,

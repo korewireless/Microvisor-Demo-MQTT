@@ -143,3 +143,46 @@ You should be able to run the demo now, it will obtain the device SID to use as 
 
 It is important to note that subscribing or publishing to topics which do not match the AWS Policy will result in the AWS MQTT broker immediately disconnecting the client.  If you are seeing unexpected disconnections of the MQTT Broker, check your policy first.
 
+# Viewing AWS IoT logs with CloudWatch
+
+A primer on setting up CloudWatch and AWS IoT logging can be found on AWS: https://docs.aws.amazon.com/iot/latest/developerguide/configure-logging.html
+
+An abbreviated version of that resource follows.
+
+## Configuring logging role
+
+NOTE: If you do not need fine grained control over the logging role setup, you can skip to the next step and use the 'Create role' button in the Log settings for the IoT core instance below.
+
+Logging requires a role, either an existing one or a new one should do.  We'll create a dedicated role:
+
+- Open https://console.aws.amazon.com/iam/home#/roles
+- Select `Create Role`
+- Set the Trusted Entity Type to `AWS Service`
+- Set the Use Case to `IoT`, using the search box if needed
+- Click `Next`
+- We'll keep the default permissions on this screen - no changes necessary
+- Click `Next`
+- Give the role a memorable name and apply a description as desired, the rest can be left as-is
+- Create the role
+
+## Configure IoT Core instance to use the logging role
+
+We'll now configure our IoT Core instance to make use of this new logging role.
+
+- Open https://us-west-2.console.aws.amazon.com/iot/home - be sure the region is set to the same region as you created your Microvisor device in above
+- Select `Settings` in the menu on the left
+- Find the Logs section and click `Manage Logs`
+- Select the logging role you just created from the select box
+- Select the logging level you desire from the drop-down
+- Click `Update`
+
+## Checking the logs
+
+Generate some traffic against IoT Core using your device then we'll view the available logs.
+
+- Open https://us-west-2.console.aws.amazon.com/cloudwatch/home (ensure the correct region is reflected in the top menu bar)
+- Select Logs then Log Groups in the menu on the left
+- Click on the AWSIoTLogsV2 group
+- To simplify viewing of the log entries, click the `Search all log streams` button
+- Here you can search for specific events or metadata.  The quickest option here is sasrch for the Microvisor device SID (starts with UV...)
+

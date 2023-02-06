@@ -112,7 +112,6 @@ void start_configuration_fetch() {
         .keys_to_fetch = items,
     };
 
-    server_log("sending config request...");
     if ((status = mvSendConfigFetchRequest(configuration_channel, &request)) != MV_STATUS_OKAY) {
         server_error("encountered an error requesting config: %x", status);
         pushWorkMessage(OnConfigFailed);
@@ -231,7 +230,6 @@ bool consume_binary_config_value(
         ) {
     enum MvStatus status;
 
-    server_log("fetching item %d", item->item_index);
     if ((status = mvReadConfigResponseItem(*configuration_channel, item)) != MV_STATUS_OKAY) {
         server_error("error reading config item index %d - %d", item->item_index, status);
         return false;
