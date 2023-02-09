@@ -21,7 +21,7 @@
 #include "log_helper.h"
 #include "config_handler.h"
 
-                        
+
 static MvChannelHandle  mqtt_channel = 0;
 static bool             broker_connected = false;
 static uint32_t         correlation_id = 0;
@@ -60,70 +60,70 @@ void start_mqtt_connect() {
         return;
     }
 
-    struct MvMqttAuthentication authentication = {
-        .method = MV_MQTTAUTHENTICATIONMETHOD_NONE,
-        .username_password = {
-            .username = {NULL, 0},
-            .password = {NULL, 0}
-        }
-    };
+struct MvMqttAuthentication authentication = {
+    .method = MV_MQTTAUTHENTICATIONMETHOD_NONE,
+    .username_password = {
+        .username = {NULL, 0},
+        .password = {NULL, 0}
+    }
+};
 
-    struct MvSizedString device_certs[] = {
-        {
-            .data = (uint8_t *)cert,
-            .length = cert_len
-        },
-    };
+struct MvSizedString device_certs[] = {
+    {
+        .data = (uint8_t *)cert,
+        .length = cert_len
+    },
+};
 
-    struct MvTlsCertificateChain device_certificate = {
-        .num_certs = 1,
-        .certs = device_certs
-    };
+struct MvTlsCertificateChain device_certificate = {
+    .num_certs = 1,
+    .certs = device_certs
+};
 
-    struct MvSizedString key = {
-        .data = (uint8_t *)private_key,
-        .length = private_key_len
-    };
+struct MvSizedString key = {
+    .data = (uint8_t *)private_key,
+    .length = private_key_len
+};
 
-    struct MvOwnTlsCertificateChain device_credentials = {
-        .chain = device_certificate,
-        .key = key
-    };
+struct MvOwnTlsCertificateChain device_credentials = {
+    .chain = device_certificate,
+    .key = key
+};
 
-    struct MvSizedString ca_certs[] = {
-        {
-            .data = (uint8_t *)root_ca,
-            .length = root_ca_len
-        },
-    };
+struct MvSizedString ca_certs[] = {
+    {
+        .data = (uint8_t *)root_ca,
+        .length = root_ca_len
+    },
+};
 
-    struct MvTlsCertificateChain server_ca_certificate = {
-        .num_certs = 1,
-        .certs = ca_certs
-    };
+struct MvTlsCertificateChain server_ca_certificate = {
+    .num_certs = 1,
+    .certs = ca_certs
+};
 
-    struct MvTlsCredentials tls_credentials = {
-        .cacert = server_ca_certificate,
-        .clientcert = device_credentials,
-    };
+struct MvTlsCredentials tls_credentials = {
+    .cacert = server_ca_certificate,
+    .clientcert = device_credentials,
+};
 
-    struct MvMqttConnectRequest request = {
-        .protocol_version = MV_MQTTPROTOCOLVERSION_V5,
-        .host = {
-            .data = broker_host,
-            .length = broker_host_len
-        },
-        .port = broker_port,
-        .clientid = {
-            .data = client,
-            .length = client_len 
-        },
-        .authentication = authentication,
-        .tls_credentials = &tls_credentials,
-        .keepalive = 60,
-        .clean_start = 0,
-        .will = NULL,
-    };
+struct MvMqttConnectRequest request = {
+    .protocol_version = MV_MQTTPROTOCOLVERSION_V5,
+    .host = {
+        .data = broker_host,
+        .length = broker_host_len
+    },
+    .port = broker_port,
+    .clientid = {
+        .data = client,
+        .length = client_len
+    },
+    .authentication = authentication,
+    .tls_credentials = &tls_credentials,
+    .keepalive = 60,
+    .clean_start = 0,
+    .will = NULL,
+};
 
     status = mvMqttRequestConnect(mqtt_channel, &request);
     if (status != MV_STATUS_OKAY) {
@@ -169,6 +169,8 @@ void start_subscriptions() {
         pushWorkMessage(OnBrokerSubscriptionRequestFailed);
         return;
     }
+
+    server_log("Listening to %s for commands", topic_str);
 }
 
 void end_subscriptions() {
@@ -442,6 +444,11 @@ bool mqtt_get_received_message_data(uint32_t *correlation_id,
 
     *topic = in_topic;
     *payload = in_payload;
+
+    char buf[*payload_len + 1];
+    memcpy(buf, message.payload.data, *message.payload.length);
+    buf[*payload_len] = 0;
+    server_log("Command received: %s", buf);
 
     return true;
 }
