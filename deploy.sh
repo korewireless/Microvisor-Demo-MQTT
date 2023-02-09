@@ -6,8 +6,8 @@
 # Upload and deploy Microvisor application code
 #
 # @author    Tony Smith
-# @copyright 2022, Twilio
-# @version   1.8.1
+# @copyright 2023, Twilio
+# @version   1.8.4
 # @license   MIT
 #
 
@@ -18,19 +18,18 @@ app_dir=app
 app_name=mv-mqtt-demo.bin
 #------------^ APP SPECIFIC ^------------
 cmake_path="${app_dir}/CMakeLists.txt"
-build_number_path="${app_dir}/.build_number"
 bin_path="build/${app_dir}/${app_name}"
-application="dummy"
 private_key_path=NONE
 public_key_path=NONE
 do_log=0
 do_build=1
 do_deploy=1
 do_update=1
+do_clean=0
 do_gen_keys=0
 output_mode=text
 mvplg_minor_min="3"
-mvplg_patch_min="7"
+mvplg_patch_min="8"
 
 # NOTE
 # This script assumes the build directory is called 'build' and exists
@@ -47,7 +46,6 @@ show_help() {
     echo -e "Usage:\n"
     echo -e "  ./deploy.sh /optional/path/to/Microvisor/app.bin\n"
     echo -e "Options:\n"
-    echo "  --application {path}  Set application to build. Default: dummy"
     echo "  --log / -l            After deployment, start log streaming. Default: no logging"
     echo "  --genkeys             Generate remote debugging keys"
     echo "  --publickey {path}    /path/to/remote/debugging/public/key.pem"
@@ -55,7 +53,8 @@ show_help() {
     echo "  --privatekey {path}   /path/to/remote/debugging/private/key.pem"
     echo "                        Must be a pre-generated file if you do not include --genkeys"
     echo "  --deploy / -d         Deploy without a build"
-    echo "  --buildonly / -b      Build without deploying"
+    echo "  --build / -b          Build but do not deploy"
+    echo "  --clean / -c          Clean build folder first"
     echo "  --logonly             Start log streaming immediately; do not build or deploy"
     echo "  --output / -o {mode}  Log output mode: \`text\` or \`json\`"
     echo "  --help / -h           Show this help screen"
@@ -74,13 +73,8 @@ stream_log() {
 set_keys() {
     echo -e "Generating Remote Debugging keys..."
     # Check for passed directories
-    if [[ -d "${private_key_path}" ]]; then
-        private_key_path="${private_key_path}/debug_auth_prv_key.pem"
-    fi
-
-    if [[ -d "${public_key_path}" ]]; then
-        public_key_path="${public_key_path}/debug_auth_pub_key.pem"
-    fi
+    [[ -d "${private_key_path}" ]] && private_key_path="${private_key_path}/debug_auth_prv_key.pem"
+    [[ -d "${public_key_path}" ]] && public_key_path="${public_key_path}/debug_auth_pub_key.pem"
 
     # Generate the keys using the Twilio CLI Microvisor plugin
     if twilio microvisor:debug:generate_keypair --debug-auth-privkey="${private_key_path}" --debug-auth-pubkey="${public_key_path}" --force ; then
@@ -119,11 +113,13 @@ check_prereqs() {
 }
 
 build_app() {
-    # Set up the build
-    cmake -S . -B build -DAPPLICATION="$application"
+    # Set up the build if we need to
+    [[ ${do_clean} -eq 1 || ! -d build ]] && cmake -S . -B build
 
     # Build the app itself
-    if cmake --build build 2>&1 ; then
+    dc=""
+    [[ ${do_clean} -eq 1 ]] && dc="--clean-first"
+    if cmake --build build ${dc} 2>&1 ; then
         echo "App built"
     else
         show_error_and_exit "Could not build the app"
@@ -131,14 +127,18 @@ build_app() {
 }
 
 update_build_number() {
-    if [ -f ${build_number_path} ]; then
-        old_num=$(<${build_number_path})
-    else
-        old_num=0
-    fi
-
+    build_val=$(grep 'set(BUILD_NUMBER "' "${cmake_path}")
+    old_num=$(echo "${build_val}" | cut -d '"' -s -f 2)
     ((new_num=old_num+1))
-    echo "$new_num" >${build_number_path}
+
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        sed -i "s|BUILD_NUMBER \"${old_num}\"|BUILD_NUMBER \"${new_num}\"|" "${cmake_path}"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS requires slightly different syntax from Unix
+        sed -i '' "s|BUILD_NUMBER \"${old_num}\"|BUILD_NUMBER \"${new_num}\"|" "${cmake_path}"
+    else
+        echo "[ERROR] Unknown OS... build number not incremented"
+    fi
 }
 
 # RUNTIME START
@@ -156,38 +156,29 @@ for arg in "$@"; do
             show_error_and_exit "Missing value for ${last_arg}"
         fi
         case "${arg_is_value}" in
-            1) application="${arg}" ;;
-            2) private_key_path="${arg}" ;;
-            3) public_key_path="${arg}"  ;;
-            4) output_mode="${check_arg}" ;;
+            1) private_key_path="${arg}" ;;
+            2) public_key_path="${arg}"  ;;
+            3) output_mode="${check_arg}" ;;
             *) echo "[Error] Unknown argument" exit 1 ;;
         esac
         arg_is_value=0
         continue
     fi
 
-    if [[ "${check_arg}" = "--application" ]]; then
+    if [[ "${check_arg}" = "--log" || "${check_arg}" = "-l" ]]; then
+        do_log=1
+    elif [[ "${check_arg}" = "--privatekey" ]]; then
         arg_is_value=1
         last_arg=${arg}
         continue
-    elif [[ "${check_arg}" = "--log" || "${check_arg}" = "-l" ]]; then
-        do_log=1
-    elif [[ "${check_arg}" = "--privatekey" ]]; then
+    elif [[ "${check_arg}" = "--publickey" ]]; then
         arg_is_value=2
         last_arg=${arg}
         continue
-    elif [[ "${check_arg}" = "--publickey" ]]; then
+    elif [[ "${check_arg}" = "--output"  || "${check_arg}" = "-o" ]]; then
         arg_is_value=3
         last_arg=${arg}
         continue
-    elif [[ "${check_arg}" = "--output"  || "${check_arg}" = "-o" ]]; then
-        arg_is_value=4
-        last_arg=${arg}
-        continue
-    elif [[ "${check_arg}" = "--buildonly" || "${check_arg}" = "-b" ]]; then
-        do_log=0
-        do_deploy=0
-        do_build=1
     elif [[ "${check_arg}" = "--logonly" ]]; then
         do_log=1
         do_deploy=0
@@ -199,6 +190,12 @@ for arg in "$@"; do
     elif [[ "${check_arg}" = "--help" || "${check_arg}" = "-h" ]]; then
         show_help
         exit 0
+    # FROM 1.8.2
+    elif [[ "${check_arg}" = "--build" || "${check_arg}" = "-b" ]]; then
+        do_deploy=0
+    # FROM 1.8.3
+    elif [[ "${check_arg}" = "--clean" || "${check_arg}" = "-c" ]]; then
+        do_clean=1
     elif [[ "${arg:0:1}" = "-" ]]; then
         show_error_and_exit "Unknown command: ${arg}"
     else
@@ -270,7 +267,7 @@ if [[ ${do_deploy} -eq 1 ]]; then
     # Try to upload the bundle
     echo "Uploading ${zip_path}..."
     upload_action=$(twilio microvisor:apps:create "${zip_path}" -o=json)
-    app_sid=$(echo "${upload_action}" | jq -r '.sid')
+    app_sid=$(echo "${upload_action}" | jq '.[0]' | jq -r .sid)
 
     if [[ -z "${app_sid}" || "${app_sid}" == "null" ]]; then
         show_error_and_exit "Could not upload app"
