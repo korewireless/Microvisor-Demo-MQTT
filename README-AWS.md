@@ -20,12 +20,12 @@ The following policy configures access for:
 
 - allowing subscription and receiving on topics `command/device/all` and `command/device/UV...` where UV... is the device SID for this device
 - allowing publishing to `sensor/device/UV...` where UV... is the device SID for this device
-- Note: replace --ID-- with your account id (visible by clicking your account name in the upper right corner of the AWS IoT Core console and selecting the copy icon next to the Account ID field)
+- Note: replace --REGION-- and --ID-- with your region and account id (visible by clicking your account name in the upper right corner of the AWS IoT Core console and selecting the copy icon next to the Account ID field)
 - Select 'Security' then 'Policies' in the AWS IoT Core menu
 - Click on `Create policy`
 - Name the policy something memorable
 - Select JSON in the Policy Document section
-- Paste in the below text, replacing --ID-- with your account id as mentioned above:
+- Paste in the below text, replacing --REGION-- and --ID-- with your region and account id as mentioned above:
 
         {
           "Version": "2012-10-17",
@@ -33,27 +33,27 @@ The following policy configures access for:
             {
               "Effect": "Allow",
               "Action": "iot:Connect",
-              "Resource": "arn:aws:iot:us-west-2:--ID--:client/${iot:Connection.Thing.ThingName}"
+              "Resource": "arn:aws:iot:--REGION--:--ID--:client/${iot:Connection.Thing.ThingName}"
             },
             {
               "Effect": "Allow",
               "Action": "iot:Publish",
-              "Resource": "arn:aws:iot:us-west-2:--ID--:topic/sensor/device/${iot:Connection.Thing.ThingName}"
+              "Resource": "arn:aws:iot:--REGION--:--ID--:topic/sensor/device/${iot:Connection.Thing.ThingName}"
             },
             {
               "Effect": "Allow",
               "Action": "iot:Subscribe",
               "Resource": [
-                "arn:aws:iot:us-west-2:--ID--:topicfilter/command/device/${iot:Connection.Thing.ThingName}",
-                "arn:aws:iot:us-west-2:--ID--:topicfilter/command/device/all"
+                "arn:aws:iot:--REGION--:--ID--:topicfilter/command/device/${iot:Connection.Thing.ThingName}",
+                "arn:aws:iot:--REGION--:--ID--:topicfilter/command/device/all"
               ]
             },
             {
               "Effect": "Allow",
               "Action": "iot:Receive",
               "Resource": [
-                "arn:aws:iot:us-west-2:--ID--:topic/command/device/${iot:Connection.Thing.ThingName}",
-                "arn:aws:iot:us-west-2:--ID--:topic/command/device/all"
+                "arn:aws:iot:--REGION--:--ID--:topic/command/device/${iot:Connection.Thing.ThingName}",
+                "arn:aws:iot:--REGION--:--ID--:topic/command/device/all"
               ]
             }
           ]
@@ -82,10 +82,31 @@ The following policy configures access for:
 
 ## Importing the authentication credentials into Microvisor
 
+Microvisor offers a key/value store for data you wish to share with devices.  These values fall into two types of data and offer two scopes:
+
+Available stores:
+
+- Configs store - less sensitive configuration values which support both setting and reading via the Microvisor REST API, and reading by Microvisor devices
+- Secrets store - sensitive configuration values which support only setting via the Microvisor REST API, and reading by Microvisor devices
+
+Available scopes:
+
+- Account - values with this scope are available to read to every Microvisor device on the owning Twilio account
+- Device - values with this scope are available to read only for the specified Microvisor device SID
+
+For this MQTT demo, we made the following choices:
+
+- MQTT endpoint configuration keys `broker-host` and `broker-port` are placed in the Configs store with Device scope.  This could have easily been Account scope if we wanted to share these values with all devices.
+- The AWS IoT CA chain is stored in `root-CA` in the Configs store with Device scope, this also could have been Account scope if our fleet of devices all use AWS IoT.
+- The AWS certificate for our device is stored in `cert` in the Configs store with Device scope.  It is appropriate to scope this type of item to a single device.  We chose the Configs store for this item as it is not sensitive on its own and may provide value in being able to query a device's public certificate later.
+- The AWS private key for the device certificate is stored in `private_key` in the Secrets store.  This means only the Microvisor device can read this value back out, it is not available via the REST API.
+
+The REST API endpoints support only non-binary data so the certificate data must be made into a URL encoded text string.  Further, the managed MQTT client in Microvisor requires DER encoded binary certificate and key data.  To work around both of these, we convert the certificates and key from AWS IoT to DER encoded binary form then send this as a hex encoded string to the cloud.  The demo code then converts the hex encoded string to binary.  We chose this format for its simplicity and lack of additional device-side dependencies, not its space efficiency.  You are welcome to use a more efficient method provided it results in DER encoded certificates and private key in your project's Microvisor device code.
+
 - Obtain the MQTT broker hostname for your IoT Core instance by selecting `Settings` in the left hand menu in the AWS console.
 - Make a copy of the `Device data endpoint` URL and keep it handy (example hostname: abcdefghi.iot.us-west-2.amazonaws.com)
 
-- The scripts below rely on the following environment variables to make things easy for you:
+- The shell snippets below rely on the following environment variables to make things easy for you:
 
         export MV_DEVICE_SID=UV...
         # the AWS Certificate ID is the 64 byte hexadecimal prefix to your downloaded certificate files
