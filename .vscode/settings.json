@@ -1,0 +1,11 @@
+{
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "cmsis_os.h": "c",
+        "freertos.h": "c",
+        "projdefs.h": "c",
+        "portable.h": "c",
+        "portmacro.h": "c",
+        "typeinfo": "c"
+    }
+}
