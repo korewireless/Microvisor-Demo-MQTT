@@ -93,5 +93,8 @@ target_include_directories(FreeRTOS PUBLIC
     FreeRTOS-Kernel/include
 )
 
+# Load cifra crypto library
+add_subdirectory(cifra)
+
 # Load the application
 add_subdirectory(app)

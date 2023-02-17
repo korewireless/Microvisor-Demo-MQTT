@@ -4,3 +4,6 @@
 [submodule "twilio-microvisor-hal-stm32u5"]
 	path = twilio-microvisor-hal-stm32u5
 	url = https://github.com/twilio/twilio-microvisor-hal-stm32u5
+[submodule "cifra/cifra"]
+	path = cifra/cifra
+	url = https://github.com/ctz/cifra.git
