@@ -480,7 +480,16 @@ void mqtt_acknowledge_message(uint32_t correlation_id) {
 }
 
 void teardown_mqtt_connect() {
-    server_log("closing mqtt channel");
+    struct MvMqttDisconnectResponse response = { 0 };
+
+    enum MvStatus status = mvMqttReadDisconnectResponse(mqtt_channel, &response);
+    if (status != MV_STATUS_OKAY) {
+        server_error("mvMqttReadDisconnectResponse returned 0x%02x", (int) status);
+        server_log("lost mqtt connection (disconnect_code not available), closing mqtt channel", response.disconnect_code);
+    } else {
+        server_log("lost mqtt connection (disconnect_code %04x), closing mqtt channel", response.disconnect_code); // Will contain the disconnect_code if using MQTT v5.  0x8E here will indicate another client with the same identity has taken over the session
+    }
+
     broker_connected = false;
     mvCloseChannel(&mqtt_channel);
 
