@@ -60,12 +60,6 @@ This project is written in C. At this time, we only support Ubuntu 20.0.4. Users
 
 ### With Docker
 
-If you are running on an architecture other than x86/amd64 (such as a Mac with Apple silicon), you will need to override the platform when running docker. This is needed for the Twilio CLI apt package which is x86 only at this time:
-
-```shell
-export DOCKER_DEFAULT_PLATFORM=linux/amd64
-```
-
 Build the image:
 
 ```shell
