@@ -26,6 +26,8 @@ add_executable(${PROJECT_NAME}
     application.c
     i2c_helper.c
     switch_helper.c
+    md5.c
+    base64.c
 )
 
 # Link built libraries
