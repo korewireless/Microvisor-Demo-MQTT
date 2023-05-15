@@ -1,8 +1,8 @@
 /**
  *
  * Microvisor Config Handler
- * Version 1.0.0
- * Copyright © 2022, Twilio
+ * Version 1.1.0
+ * Copyright © 2023, Twilio
  * Licence: Apache 2.0
  *
  */
@@ -16,6 +16,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Microvisor includes
+#include "stm32u5xx_hal.h"
+#include "mv_syscalls.h"
+
 
 /*
  * MACROS
@@ -28,12 +32,7 @@
  * DEFINES
  */
 #define TAG_CHANNEL_CONFIG 100
-
-#define BUF_CLIENT_SIZE 34
-#define BUF_BROKER_HOST 128
-#define BUF_ROOT_CA 1024
-#define BUF_CERT 1024
-#define BUF_PRIVATE_KEY 1536
+//#define CONFIG_DEBUGGING
 
 #define BUF_READ_BUFFER 3*1024
 
@@ -44,28 +43,41 @@ extern "C" {
 
 
 /*
- * PROTOTYPES
+ * TYPES
  */
-void start_configuration_fetch();
-void receive_configuration_items();
-void finish_configuration_fetch();
+enum ConfigItemType {
+    CONFIG_ITEM_TYPE_UINT8           = 0x0, //< uint8_t buffer reception; populates into .u8_item
+    CONFIG_ITEM_TYPE_B64             = 0x1, //< uint8_t buffer reception, but b64 decode received bytes; populates into .u8_item
+    CONFIG_ITEM_TYPE_ULONG           = 0x2, //< uint16_t value reception; populates into .ulong_item
+    CONFIG_ITEM_TYPE_LONG            = 0x3, //< int16_t value reception; populates into .long_item
+};
 
+struct ConfigHelperItem {
+    enum ConfigItemType config_type;
+    struct MvConfigKeyToFetch item;
+    union {
+        struct {
+            uint8_t *buf; // pointer to the buffer
+            size_t buf_size; // size of allocated buffer
+            size_t *buf_len; // pointer to populate length of data read into
+        } u8_item;
+
+        struct {
+            uint16_t *val;
+        } ulong_item;
+
+        struct {
+            int16_t *val;
+        } long_item;
+    };
+};
 
 /*
- * GLOBALS
+ * PROTOTYPES
  */
-extern uint8_t  client[BUF_CLIENT_SIZE];
-extern size_t   client_len;
-
-extern uint8_t  broker_host[BUF_BROKER_HOST];
-extern size_t   broker_host_len;
-extern uint16_t broker_port;
-extern uint8_t  root_ca[BUF_ROOT_CA];
-extern size_t   root_ca_len;
-extern uint8_t  cert[BUF_CERT];
-extern size_t   cert_len;
-extern uint8_t  private_key[BUF_PRIVATE_KEY];
-extern size_t   private_key_len;
+void start_configuration_fetch(const struct ConfigHelperItem *items, uint8_t count);
+void receive_configuration_items(struct ConfigHelperItem *items, uint8_t count);
+void finish_configuration_fetch();
 
 
 #ifdef __cplusplus

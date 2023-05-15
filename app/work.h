@@ -33,6 +33,28 @@ extern "C" {
 #define BUF_SEND_SIZE 4*1024
 #define BUF_RECEIVE_SIZE 7*1024
 
+// CONFIG DATA
+
+#define CERTIFICATE_AUTH
+//#define USERNAMEPASSWORD_AUTH
+
+//#define CUSTOM_CLIENT_ID
+
+#define BUF_CLIENT_SIZE 34
+
+#define BUF_BROKER_HOST 128
+
+#ifdef CERTIFICATE_AUTH
+#define BUF_ROOT_CA 1024
+#define BUF_CERT 1024
+#define BUF_PRIVATE_KEY 1536
+#endif // CERTIFICATE_AUTH
+
+#ifdef USERNAMEPASSWORD_AUTH
+#define BUF_USERNAME 128
+#define BUF_PASSWORD 128
+#endif // USERNAMEPASSWORD_AUTH
+
 
 /*
  * TYPES
@@ -100,6 +122,36 @@ extern uint8_t *incoming_message_topic;
 extern uint32_t incoming_message_topic_len;
 extern uint8_t *incoming_message_payload;
 extern uint32_t incoming_message_payload_len;
+
+// CONFIG DATA
+
+extern uint8_t *incoming_message_topic;
+extern uint32_t incoming_message_topic_len;
+extern uint8_t *incoming_message_payload;
+extern uint32_t incoming_message_payload_len;
+
+extern uint8_t  client[BUF_CLIENT_SIZE];
+extern size_t   client_len;
+
+extern uint8_t  broker_host[BUF_BROKER_HOST];
+extern size_t   broker_host_len;
+extern uint16_t broker_port;
+
+#ifdef CERTIFICATE_AUTH
+extern uint8_t  root_ca[BUF_ROOT_CA];
+extern size_t   root_ca_len;
+extern uint8_t  cert[BUF_CERT];
+extern size_t   cert_len;
+extern uint8_t  private_key[BUF_PRIVATE_KEY];
+extern size_t   private_key_len;
+#endif // CERTIFICATE_AUTH
+
+#ifdef USERNAMEPASSWORD_AUTH
+extern uint8_t  username[BUF_USERNAME];
+extern size_t   username_len;
+extern uint8_t  password[BUF_PASSWORD];
+extern size_t   password_len;
+#endif // USERNAMEPASSWORD_AUTH
 
 
 #ifdef __cplusplus
