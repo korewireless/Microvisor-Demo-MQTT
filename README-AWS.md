@@ -120,11 +120,11 @@ The REST API endpoints support only non-binary data so the certificate data must
         export BROKER_HOST=xxxx.amazonaws.com
         export BROKER_PORT=8883
 
-- The certificate data from AWS IoT is provided in PEM format, but for space considerations Microvisor needs this information in DER format so we will convert it:
+- The certificate data from AWS IoT is provided in PEM format, but for space considerations Microvisor needs the PKCS#8 format private key and certificates as DER format binary values, so we will convert them:
 
         openssl x509 -inform pem -in AmazonRootCA1.pem -outform der -out root-ca.der
         openssl x509 -inform pem -in ${AWS_CERTIFICATE_ID}-certificate.pem.crt -outform der -out ${MV_DEVICE_SID}-cert.der
-        openssl rsa -inform pem -in ${AWS_CERTIFICATE_ID}-private.pem.key -outform der -out ${MV_DEVICE_SID}-private_key.der
+        openssl pkcs8 -topk8 -in ${AWS_CERTIFICATE_ID}-private.pem.key -inform pem -out ${MV_DEVICE_SID}-private_key.der -outform der -nocrypt
 
 - Next, we will add configuration and secret items to Microvisor for this device
 
