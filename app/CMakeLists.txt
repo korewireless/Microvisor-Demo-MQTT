@@ -26,6 +26,7 @@ add_executable(${PROJECT_NAME}
     application.c
     i2c_helper.c
     switch_helper.c
+    azure_helper.c
     md5.c
     base64.c
 )
@@ -34,7 +35,9 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} LINK_PUBLIC
     ST_Code
     twilio-microvisor-hal-stm32u5
-    FreeRTOS)
+    FreeRTOS
+    cifra
+    )
 
 # Build .bin file required for app bundle creation
 add_custom_command(OUTPUT BUILD_ARTIFACTS DEPENDS ${PROJECT_NAME}

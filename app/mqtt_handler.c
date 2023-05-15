@@ -31,6 +31,8 @@ static uint32_t         temp_num_items;
 static uint8_t in_topic[1024];
 static uint8_t in_payload[1024];
 
+const time_t SAS_TOKEN_LIFESPAN = 60*60*24*30;
+
 /*
  * @brief Open channel for mqtt tasks
  */
@@ -60,66 +62,58 @@ void start_mqtt_connect() {
         return;
     }
 
+    uint8_t azure_username[CREDENTIAL_SIZE] = {0};
+    size_t azure_username_len = 0;
+    uint8_t azure_password[CREDENTIAL_SIZE] = {0};
+    size_t azure_password_len = 0;
+
+    uint64_t now = 0;
+    while (mvGetWallTime(&now) != MV_STATUS_OKAY) {} // we should have a valid time by now from the mv cloud, but make sure
+    time_t expiry = (now/1000/1000) + SAS_TOKEN_LIFESPAN;
+
+    if (!populate_azure_username(&azure_params, azure_username, &azure_username_len, CREDENTIAL_SIZE)) {
+        server_error("mvMqttRequestConnect username generation failed");
+        pushWorkMessage(OnBrokerConnectFailed);
+        return;
+    }
+
+    if (!generate_azure_password(&azure_params, azure_password, &azure_password_len, CREDENTIAL_SIZE, expiry)) {
+        server_error("mvMqttRequestConnect password generation failed");
+        pushWorkMessage(OnBrokerConnectFailed);
+        return;
+    }
+
+    struct MvSizedString username = {
+        .data = (uint8_t *)azure_username,
+        .length = azure_username_len
+    };
+
+    struct MvSizedString password = {
+        .data = (uint8_t *)azure_password,
+        .length = azure_password_len
+    };
+
     struct MvMqttAuthentication authentication = {
-        .method = MV_MQTTAUTHENTICATIONMETHOD_NONE,
+        .method = MV_MQTTAUTHENTICATIONMETHOD_USERNAMEPASSWORD,
         .username_password = {
-            .username = {NULL, 0},
-            .password = {NULL, 0}
+            .username = username,
+            .password = password
         }
     };
 
-    struct MvSizedString device_certs[] = {
-        {
-            .data = (uint8_t *)cert,
-            .length = cert_len
-        },
-    };
-
-    struct MvTlsCertificateChain device_certificate = {
-        .num_certs = 1,
-        .certs = device_certs
-    };
-
-    struct MvSizedString key = {
-        .data = (uint8_t *)private_key,
-        .length = private_key_len
-    };
-
-    struct MvOwnTlsCertificateChain device_credentials = {
-        .chain = device_certificate,
-        .key = key
-    };
-
-    struct MvSizedString ca_certs[] = {
-        {
-            .data = (uint8_t *)root_ca,
-            .length = root_ca_len
-        },
-    };
-
-    struct MvTlsCertificateChain server_ca_certificate = {
-        .num_certs = 1,
-        .certs = ca_certs
-    };
-
-    struct MvTlsCredentials tls_credentials = {
-        .cacert = server_ca_certificate,
-        .clientcert = device_credentials,
-    };
-
     struct MvMqttConnectRequest request = {
-        .protocol_version = MV_MQTTPROTOCOLVERSION_V5,
+        .protocol_version = MV_MQTTPROTOCOLVERSION_V3_1_1, // Azure is 3.1.1 only at this time
         .host = {
-            .data = broker_host,
-            .length = broker_host_len
+            .data = azure_params.hostname,
+            .length = azure_params.hostname_len 
         },
-        .port = broker_port,
+        .port = 8883,
         .clientid = {
             .data = client,
             .length = client_len 
         },
         .authentication = authentication,
-        .tls_credentials = &tls_credentials,
+        .tls_credentials = NULL,
         .keepalive = 60,
         .clean_start = 0,
         .will = NULL,
@@ -139,7 +133,7 @@ bool is_broker_connected() {
 
 void start_subscriptions() {
     char topic_str[128];
-    sprintf(topic_str, "command/device/%.*s", client_len, client);
+    sprintf(topic_str, "devices/%.*s/messages/devicebound/", client_len, client);
 
     enum MvStatus status;
 
@@ -173,7 +167,7 @@ void start_subscriptions() {
 
 void end_subscriptions() {
     char topic_str[128];
-    sprintf(topic_str, "command/device/%.*s", client_len, client);
+    sprintf(topic_str, "devices/%.*s/messages/devicebound/", client_len, client);
 
     enum MvStatus status;
 
@@ -201,7 +195,7 @@ void end_subscriptions() {
 
 void publish_message(const char* payload) {
     char topic_str[128];
-    sprintf(topic_str, "sensor/device/%.*s", client_len, client); // For AWS, requires policy to allow publish access to "arn:aws:iot:<<region>>:<<account>>:topic/sensor/device/<<DEVICE_SID>>"
+    sprintf(topic_str, "devices/%.*s/messages/events/", client_len, client); // For Azure, topic names are strictly defined.  device bound messages can be sent to 'devices/<device_id>/messages/devicebound/' and device sourced messages can be sent to 'devices/<device_id>/messages/events/'
 
     enum MvStatus status;
 

@@ -38,7 +38,7 @@ const osThreadAttr_t network_task_attributes = {
 osThreadId_t WorkTask;
 const osThreadAttr_t work_task_attributes = {
     .name = "WorkTask",
-    .stack_size = configMINIMAL_STACK_SIZE + 3072, // specified in words, size 4 for Microvisor - we do a lot of work in this thread, allocate accordingly
+    .stack_size = configMINIMAL_STACK_SIZE + 4096, // specified in words, size 4 for Microvisor - we do a lot of work in this thread, allocate accordingly
     .priority = (osPriority_t) osPriorityNormal
 };
 

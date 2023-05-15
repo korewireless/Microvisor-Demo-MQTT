@@ -22,7 +22,7 @@
  * DEFINES
  */
 #define TAG_CHANNEL_MQTT 101
-
+#define CREDENTIAL_SIZE 256
 
 #ifdef __cplusplus
 extern "C" {
