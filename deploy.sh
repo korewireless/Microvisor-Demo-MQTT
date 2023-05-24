@@ -270,7 +270,7 @@ if [[ ${do_deploy} -eq 1 ]]; then
     # Try to upload the bundle
     echo "Uploading ${zip_path}..."
     upload_action=$(twilio microvisor:apps:create "${zip_path}" -o=json)
-    app_sid=$(echo "${upload_action}" | jq -r '.sid')
+    app_sid=$(echo "${upload_action}" | jq -r '.[0].sid')
 
     if [[ -z "${app_sid}" || "${app_sid}" == "null" ]]; then
         show_error_and_exit "Could not upload app"
