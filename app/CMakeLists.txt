@@ -4,7 +4,12 @@ cmake_minimum_required(VERSION 3.14)
 set(APP "Microvisor MQTT Demo")
 set(VERSION_NUMBER "1.0.0")
 
+file (TOUCH ".build_number")
 file (STRINGS ".build_number" BUILD_NUMBER)
+
+if(BUILD_NUMBER STREQUAL "")
+    set(BUILD_NUMBER "0")
+endif()
 
 message("Building ${APP} ${VERSION_NUMBER} build ${BUILD_NUMBER}")
 
