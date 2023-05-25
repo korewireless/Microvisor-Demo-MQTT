@@ -126,8 +126,10 @@ sudo apt install -y twilio
 Close your terminal window or tab, and open a new one. Now run:
 
 ```bash
-twilio plugins:install @twilio/plugin-microvisor
+twilio plugins:install "@twilio/plugin-microvisor@0.3.7"
 ```
+
+Note: This project currently requires the plugin-microvisor version 0.3.7.  It will not work with newer versions of the plugin.
 
 ### Environment Variables
 
