@@ -11,6 +11,7 @@
 #include "network_helper.h"
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 // Microvisor includes
 #include "stm32u5xx_hal.h"
@@ -155,7 +156,7 @@ static void configure_network() {
 
     if (network_handle != 0) { // we already have a conection handle, drop out
         return;
-    }    
+    }
 
     configure_notification_center();
 
