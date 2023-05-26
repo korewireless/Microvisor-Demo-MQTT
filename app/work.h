@@ -15,6 +15,7 @@
  * INCLUDES
  */
 #include <stdbool.h>
+#include <assert.h>
 
 // Microvisor includes
 #include "stm32u5xx_hal.h"
@@ -102,7 +103,7 @@ enum WorkMessageType {
     OnApplicationConsumedMessage = 0x90,
     OnApplicationProducedMessage,
 };
-  
+
 /*
  * PROTOTYPES
  */
