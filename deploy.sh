@@ -7,7 +7,7 @@
 #
 # @author    Tony Smith
 # @copyright 2022, Twilio
-# @version   1.8.1
+# @version   1.8.4a
 # @license   MIT
 #
 
@@ -30,7 +30,7 @@ do_update=1
 do_gen_keys=0
 output_mode=text
 mvplg_minor_min="3"
-mvplg_patch_min="7"
+mvplg_patch_min="8"
 
 # NOTE
 # This script assumes the build directory is called 'build' and exists
