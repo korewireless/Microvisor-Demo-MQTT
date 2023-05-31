@@ -66,9 +66,12 @@ uint8_t  broker_host[BUF_BROKER_HOST] = {0};
 size_t   broker_host_len = 0;
 uint16_t broker_port = 0;
 
-#if defined(CERTIFICATE_AUTH)
+#if defined(CERTIFICATE_CA)
 uint8_t  root_ca[BUF_ROOT_CA] = {0};
 size_t   root_ca_len = 0;
+#endif // CERTIFICATE_CA
+
+#if defined(CERTIFICATE_AUTH)
 uint8_t  cert[BUF_CERT] = {0};
 size_t   cert_len = 0;
 uint8_t  private_key[BUF_PRIVATE_KEY] = {0};
@@ -148,22 +151,14 @@ struct ConfigHelperItem config_items[] = {
 #endif // CUSTOM_CLIENT_ID
 
     /*
-     * Defining CERTIFICATE_AUTH allows you to specify certificate
-     * details for authentication.
+     * Defining CERTIFICATE_CA allows you to specify certificate
+     * details for CA validation.
      *
      * Store:       CONFIG
      * Store Scope: DEVICE
      * Store Key:   root-CA
-     *
-     * Store:       CONFIG
-     * Store Scope: DEVICE
-     * Store Key:   cert
-     *
-     * Store:       SECRET
-     * Store Scope: DEVICE
-     * Store Key:   private_key
      */
-#if defined(CERTIFICATE_AUTH)
+#if defined(CERTIFICATE_CA)
     {
         .config_type = CONFIG_ITEM_TYPE_B64,
         .item = {
@@ -177,6 +172,21 @@ struct ConfigHelperItem config_items[] = {
             .buf_len = &root_ca_len
         }
     },
+#endif // CERTIFICATE_CA
+
+    /*
+     * Defining CERTIFICATE_AUTH allows you to specify certificate
+     * details for authentication.
+     *
+     * Store:       CONFIG
+     * Store Scope: DEVICE
+     * Store Key:   cert
+     *
+     * Store:       SECRET
+     * Store Scope: DEVICE
+     * Store Key:   private_key
+     */
+#if defined(CERTIFICATE_AUTH)
     {
         .config_type = CONFIG_ITEM_TYPE_B64,
         .item = {

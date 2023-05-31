@@ -36,6 +36,7 @@ extern "C" {
 
 // CONFIG DATA
 
+#define CERTIFICATE_CA
 #define CERTIFICATE_AUTH
 //#define USERNAMEPASSWORD_AUTH
 
@@ -45,13 +46,16 @@ extern "C" {
 
 #define BUF_BROKER_HOST 128
 
-#ifdef CERTIFICATE_AUTH
-#define BUF_ROOT_CA 1024
+#if defined(CERTIFICATE_CA)
+#define BUF_ROOT_CA 1536
+#endif // CERTIFICATE_CA
+
+#if defined(CERTIFICATE_AUTH)
 #define BUF_CERT 1024
 #define BUF_PRIVATE_KEY 1536
 #endif // CERTIFICATE_AUTH
 
-#ifdef USERNAMEPASSWORD_AUTH
+#if defined(USERNAMEPASSWORD_AUTH)
 #define BUF_USERNAME 128
 #define BUF_PASSWORD 128
 #endif // USERNAMEPASSWORD_AUTH
@@ -138,16 +142,19 @@ extern uint8_t  broker_host[BUF_BROKER_HOST];
 extern size_t   broker_host_len;
 extern uint16_t broker_port;
 
-#ifdef CERTIFICATE_AUTH
+#if defined(CERTIFICATE_CA)
 extern uint8_t  root_ca[BUF_ROOT_CA];
 extern size_t   root_ca_len;
+#endif // CERTIFICATE_CA
+
+#if defined(CERTIFICATE_AUTH)
 extern uint8_t  cert[BUF_CERT];
 extern size_t   cert_len;
 extern uint8_t  private_key[BUF_PRIVATE_KEY];
 extern size_t   private_key_len;
 #endif // CERTIFICATE_AUTH
 
-#ifdef USERNAMEPASSWORD_AUTH
+#if defined(USERNAMEPASSWORD_AUTH)
 extern uint8_t  username[BUF_USERNAME];
 extern size_t   username_len;
 extern uint8_t  password[BUF_PASSWORD];
