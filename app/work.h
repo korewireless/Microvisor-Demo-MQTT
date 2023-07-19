@@ -60,6 +60,7 @@ extern "C" {
 #define BUF_PASSWORD 128
 #endif // USERNAMEPASSWORD_AUTH
 
+//#define WORK_DEBUGGING
 
 /*
  * TYPES

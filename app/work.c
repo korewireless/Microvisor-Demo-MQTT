@@ -313,13 +313,22 @@ void start_work_task(void *argument) {
                     mvGetDeviceId(client, BUF_CLIENT_SIZE);
                     client_len = BUF_CLIENT_SIZE;
 #endif
+#if defined(WORK_DEBUGGING)
+                    server_log("starting config fetch");
+#endif
                     start_configuration_fetch(config_items, num_items);
                     break;
                 case OnConfigRequestReturn:
+#if defined(WORK_DEBUGGING)
+                    server_log("config returned");
+#endif
                     wait_for_config = false;
                     receive_configuration_items(config_items, num_items);
                     break;
                 case OnConfigObtained:
+#if defined(WORK_DEBUGGING)
+                    server_log("config obtained");
+#endif
                     finish_configuration_fetch();
                     pushWorkMessage(ConnectMQTTBroker);
                     break;
@@ -329,13 +338,22 @@ void start_work_task(void *argument) {
                     finish_configuration_fetch();
                     break;
                 case ConnectMQTTBroker:
+#if defined(WORK_DEBUGGING)
+                    server_log("connecting broker");
+#endif
                     start_mqtt_connect();
                     break;
                 case OnBrokerConnected:
+#if defined(WORK_DEBUGGING)
+                    server_log("broker connected");
+#endif
                     mqtt_connection_active = true;
                     start_subscriptions();
                     break;
                 case OnBrokerSubscribeSucceeded:
+#if defined(WORK_DEBUGGING)
+                    server_log("topics subscribed");
+#endif
                     pushApplicationMessage(OnMqttConnected);
                     break;
                 case OnBrokerSubscribeFailed:
@@ -349,6 +367,9 @@ void start_work_task(void *argument) {
                     mqtt_disconnect();
                     break;
                 case OnBrokerPublishSucceeded:
+#if defined(WORK_DEBUGGING)
+                    server_log("publish succeeded");
+#endif
                     break;
                 case OnBrokerPublishFailed:
                     server_error("publish failed");
@@ -381,12 +402,17 @@ void start_work_task(void *argument) {
                 case OnBrokerDroppedConnection:
                     mqtt_connection_active = false;
                     teardown_mqtt_connect();
+#if defined(WORK_DEBUGGING)
                     server_log("mqtt channel closed by server");
+#endif
                     break;
                 case OnMQTTReadable:
                     mqtt_handle_readable_event();
                     break;
                 case OnMQTTEventConnectResponse:
+#if defined(WORK_DEBUGGING)
+                    server_log("received mqtt connect response");
+#endif
                     mqtt_handle_connect_response_event();
                     break;
                 case OnMQTTEventMessageReceived:
@@ -409,18 +435,33 @@ void start_work_task(void *argument) {
                     }
                     break;
                 case OnMQTTEventSubscribeResponse:
+#if defined(WORK_DEBUGGING)
+                    server_log("received mqtt subscribe response");
+#endif
                     mqtt_handle_subscribe_response_event();
                     break;
                 case OnMQTTEventUnsubscribeResponse:
+#if defined(WORK_DEBUGGING)
+                    server_log("received mqtt unsubscribe response");
+#endif
                     mqtt_handle_unsubscribe_response_event();
                     break;
                 case OnMQTTEventPublishResponse:
+#if defined(WORK_DEBUGGING)
+                    server_log("received mqtt publish response");
+#endif
                     mqtt_handle_publish_response_event();
                     break;
                 case OnMQTTEventDisconnectResponse:
+#if defined(WORK_DEBUGGING)
+                    server_log("received mqtt disconnect response");
+#endif
                     teardown_mqtt_connect();
                     break;
                 case OnApplicationConsumedMessage:
+#if defined(WORK_DEBUGGING)
+                    server_log("application consumed message");
+#endif
                     if(application_processing_message) {
                         mqtt_acknowledge_message(correlation_id);
 
@@ -439,6 +480,9 @@ void start_work_task(void *argument) {
                   break;
 
                 case OnApplicationProducedMessage:
+#if defined(WORK_DEBUGGING)
+                    server_log("application produced message, publishing");
+#endif
                   publish_message(application_message_payload);
                   pushApplicationMessage(OnMqttMessageSent);
                   break;

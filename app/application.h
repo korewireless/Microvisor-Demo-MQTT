@@ -15,6 +15,12 @@ extern "C" {
 #endif
 
 /*
+ * DEFINES
+ */
+
+//#define APPLICATION_DEBUGGING
+
+/*
  * TYPES
  */
 enum ApplicationMessageType {
