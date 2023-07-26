@@ -9,6 +9,11 @@ set(ENABLE_REMOTE_DEBUGGING 1)
 # Set to false to stop '[DEBUG]' messages being logged
 add_compile_definitions(LOG_DEBUG_MESSAGES=true)
 
+# Defines to enable various logging sets
+#add_compile_definitions(APPLICATION_DEBUGGING)
+#add_compile_definitions(CONFIG_DEBUGGING)
+#add_compile_definitions(WORK_DEBUGGING)
+
 # Set application
 set(APPLICATION "dummy" CACHE STRING "application to build")
 

@@ -6,9 +6,11 @@ It is based on the [FreeRTOS](https://freertos.org/) real-time operating system 
 
 The [ARM CMSIS-RTOS API](https://github.com/ARM-software/CMSIS_5) is used as an intermediary between the application and FreeRTOS to make it easier to swap out the RTOS layer for another.
 
-The application code files can be found in the [app_src/](app_src/) directory. The [ST_Code/](ST_Code/) directory contains required components that are not part of Twilio Microvisor STM32U5 HAL, which this sample accesses as a submodule. The `FreeRTOSConfig.h` and `stm32u5xx_hal_conf.h` configuration files are located in the [config/](config/) directory.
+The application code files can be found in the [app/](app/) directory. The [ST_Code/](ST_Code/) directory contains required components that are not part of Twilio Microvisor STM32U5 HAL, which this sample accesses as a submodule. The `FreeRTOSConfig.h` and `stm32u5xx_hal_conf.h` configuration files are located in the [config/](config/) directory.
 
 ## Release Notes
+
+Version 1.0.1 expands authentication options within the code and documentation on configuring the demo.
 
 Version 1.0.0 is the initial MQTT demo.
 
@@ -51,6 +53,25 @@ We recommend following this by deleting your `build` directory.
 You will need a Twilio account. [Sign up now if you don’t have one](https://www.twilio.com/try-twilio).
 
 You will also need a Twilio Microvisor [Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board). These are currently only available to Beta Program participants: [Join the Beta](https://interactive.twilio.com/iot-microvisor-private-beta-sign-up?utm_source=github&utm_medium=github&utm_campaign=IOT&utm_content=MQTT_GitHub_Demo).
+
+### MQTT Broker
+
+MQTT is quite flexible both in authentication mechanisms offered as well as how brokers can choose to allow publishing and subscribing to topics.
+
+Unless using a self-hosted broker, such as [Eclipse Mosquitto](https://mosquitto.org/) you will need to adhere to your chosen broker's security and usage guidelines which may specify not just authentication mechanism but also allowable publish and subscribe topics, restrictions on client identifier, etc.
+
+While we cannot document every broker that is compatible with Microvisor we have taken two approaches to assist you:
+
+- We support a wide variety of configuration options per the MQTT specification for compatibility with most v3.1.1 and v5 brokers
+- We have documented a number of paths for use with this codebase
+
+For help connecting to a generic MQTT broker or one not explicitly listed below, please visit [general MQTT options](README-General.md).
+
+For a guide on connecting to AWS IoT's MQTT broker, please visit our [AWS IoT guide](README-AWS.md).
+
+For a repository extended to support Azure's use of SAS token authentication, please visit out [Azure MQTT Demo](https://github.com/twilio/twilio-microvisor-azure-demo/).
+
+You may benefit from enabling additional debugging in the demo application as you are working with it, to obtain the most verbose logging you can un-comment the debugging directives in CMakeLists.txt before building.
 
 ## Software Setup
 
