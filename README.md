@@ -1,4 +1,4 @@
-# Microvisor MQTT Demo 1.0.0
+# Microvisor MQTT Demo 1.0.1
 
 This repo provides a basic demonstration of a user application capable of working with Microvisor’s MQTT communications system calls. It has no hardware dependencies beyond the Twilio Microvisor Nucleo Development Board.
 

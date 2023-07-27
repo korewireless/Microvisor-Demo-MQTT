@@ -32,7 +32,6 @@
  * DEFINES
  */
 #define TAG_CHANNEL_CONFIG 100
-//#define CONFIG_DEBUGGING
 
 #define BUF_READ_BUFFER 3*1024
 
