@@ -130,6 +130,9 @@ void application_poll() {
        message_in_flight = true;
 
        sprintf(application_message_payload, "{\"temperature_celsius\":%.2f}", sensor_data);
+#if defined(APPLICATION_DEBUGGING)
+       server_log("publishing: %s", application_message_payload);
+#endif
        pushWorkMessage(OnApplicationProducedMessage);
 
        sensor_data += 0.1;

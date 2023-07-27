@@ -60,6 +60,25 @@ void start_mqtt_connect() {
         return;
     }
 
+#if defined(USERNAMEPASSWORD_AUTH)
+    struct MvSizedString auth_username = {
+        .data = (uint8_t *)username,
+        .length = username_len
+    };
+
+    struct MvSizedString auth_password = {
+        .data = (uint8_t *)password,
+        .length = password_len
+    };
+
+    struct MvMqttAuthentication authentication = {
+        .method = MV_MQTTAUTHENTICATIONMETHOD_USERNAMEPASSWORD,
+        .username_password = {
+            .username = auth_username,
+            .password = auth_password
+        }
+    };
+#else
     struct MvMqttAuthentication authentication = {
         .method = MV_MQTTAUTHENTICATIONMETHOD_NONE,
         .username_password = {
@@ -67,7 +86,9 @@ void start_mqtt_connect() {
             .password = {NULL, 0}
         }
     };
+#endif
 
+#if defined(CERTIFICATE_AUTH)
     struct MvSizedString device_certs[] = {
         {
             .data = (uint8_t *)cert,
@@ -89,7 +110,9 @@ void start_mqtt_connect() {
         .chain = device_certificate,
         .key = key
     };
+#endif
 
+#if defined(CERTIFICATE_CA)
     struct MvSizedString ca_certs[] = {
         {
             .data = (uint8_t *)root_ca,
@@ -101,11 +124,22 @@ void start_mqtt_connect() {
         .num_certs = 1,
         .certs = ca_certs
     };
+#endif
 
+#if defined(CERTIFICATE_CA) || defined(CERTIFICATE_AUTH)
     struct MvTlsCredentials tls_credentials = {
+#if defined(CERTIFICATE_CA)
         .cacert = server_ca_certificate,
+#else
+        .cacert = {{0}},
+#endif
+#if defined(CERTIFICATE_AUTH)
         .clientcert = device_credentials,
+#else
+        .clientcert = {{0}},
+#endif
     };
+#endif
 
     struct MvMqttConnectRequest request = {
         .protocol_version = MV_MQTTPROTOCOLVERSION_V5,
@@ -119,7 +153,11 @@ void start_mqtt_connect() {
             .length = client_len 
         },
         .authentication = authentication,
+#if defined(CERTIFICATE_CA) || defined(CERTIFICATE_AUTH)
         .tls_credentials = &tls_credentials,
+#else
+        .tls_credentials = NULL,
+#endif
         .keepalive = 60,
         .clean_start = 0,
         .will = NULL,
@@ -279,7 +317,7 @@ void mqtt_handle_connect_response_event() {
     }
 
     if (response.request_state != MV_MQTTREQUESTSTATE_REQUESTCOMPLETED) {
-        server_error("connect error: response.request_state = %d", response.request_state);
+        server_error("connect error: response.request_state = %d, reason_code: 0x%02x", response.request_state, (int) response.reason_code);
         // not the status we expect
         pushWorkMessage(OnBrokerConnectFailed);
         return;
