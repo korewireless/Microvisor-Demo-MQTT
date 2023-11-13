@@ -1,24 +1,23 @@
 # Microvisor MQTT Demo 1.0.1
 
-This repo provides a basic demonstration of a user application capable of working with Microvisor’s MQTT communications system calls. It has no hardware dependencies beyond the Twilio Microvisor Nucleo Development Board.
+This repo provides a basic demonstration of a user application capable of working with Microvisor’s MQTT communications system calls. It has no hardware dependencies beyond the Microvisor Nucleo Development Board.
 
 It is based on the [FreeRTOS](https://freertos.org/) real-time operating system and which will run on the “non-secure” side of Microvisor. FreeRTOS is included as a submodule.
 
 The [ARM CMSIS-RTOS API](https://github.com/ARM-software/CMSIS_5) is used as an intermediary between the application and FreeRTOS to make it easier to swap out the RTOS layer for another.
 
-The application code files can be found in the [app/](app/) directory. The [ST_Code/](ST_Code/) directory contains required components that are not part of Twilio Microvisor STM32U5 HAL, which this sample accesses as a submodule. The `FreeRTOSConfig.h` and `stm32u5xx_hal_conf.h` configuration files are located in the [config/](config/) directory.
+The application code files can be found in the [app/](app/) directory. The [ST_Code/](ST_Code/) directory contains required components that are not part of the Microvisor STM32U5 HAL, which this sample accesses as a submodule. The `FreeRTOSConfig.h` and `stm32u5xx_hal_conf.h` configuration files are located in the [config/](config/) directory.
 
 ## Release Notes
 
-Version 1.0.1 expands authentication options within the code and documentation on configuring the demo.
-
-Version 1.0.0 is the initial MQTT demo.
+* Version 1.0.1 expands authentication options within the code and documentation on configuring the demo.
+* Version 1.0.0 is the initial MQTT demo.
 
 ## Actions
 
 The code creates and runs four threads:
 
-- A thread periodically toggles GPIO A5, which is the user LED on the [Microvisor Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board).  This acts as a heartbeat to let you know the demo is working.
+- A thread periodically toggles GPIO A5, which is the user LED on the [Microvisor Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board). This acts as a heartbeat to let you know the demo is working.
 - A thread manages the network state of your application, requesting control of the network from Microvisor.
 - A work thread which consumes events and dispatches them in support of the configuration loading and managed MQTT broker operations.
 - An application thread which consumes data from an attached sensor (or demo source) and sends it to the work thread for publishing.
@@ -28,19 +27,19 @@ The code creates and runs four threads:
 This repo makes uses of git submodules, some of which are nested within other submodules. To clone the repo, run:
 
 ```bash
-git clone https://github.com/twilio/twilio-microvisor-mqtt-demo.git
+git clone https://github.com/korewireless/Microvisor-Demo-MQTT.git
 ```
 
 and then:
 
 ```bash
-cd twilio-microvisor-mqtt-demo
+cd Microvisor-Demo-MQTT
 git submodule update --init --recursive
 ```
 
 ## Repo Updates
 
-When the repo is updated, and you pull the changes, you should also always update dependency submodules. To do so, run:
+Whenever the repo is updated, and you pull the changes, you should also always update dependency submodules. To do so, run:
 
 ```bash
 git submodule update --remote --recursive
@@ -52,7 +51,7 @@ We recommend following this by deleting your `build` directory.
 
 You will need a Twilio account. [Sign up now if you don’t have one](https://www.twilio.com/try-twilio).
 
-You will also need a Twilio Microvisor [Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board). These are currently only available to Beta Program participants: [Join the Beta](https://interactive.twilio.com/iot-microvisor-private-beta-sign-up?utm_source=github&utm_medium=github&utm_campaign=IOT&utm_content=MQTT_GitHub_Demo).
+You will also need a [Microvisor Nucleo Development Board](https://www.twilio.com/docs/iot/microvisor/microvisor-nucleo-development-board). These are currently only available to Beta Program participants: [Join the Beta](https://www.korewireless.com/mv-signup).
 
 ### MQTT Broker
 
@@ -69,7 +68,7 @@ For help connecting to a generic MQTT broker or one not explicitly listed below,
 
 For a guide on connecting to AWS IoT's MQTT broker, please visit our [AWS IoT guide](README-AWS.md).
 
-For a repository extended to support Azure's use of SAS token authentication, please visit out [Azure MQTT Demo](https://github.com/twilio/twilio-microvisor-azure-demo/).
+For a repository extended to support Azure's use of SAS token authentication, please visit out [Azure MQTT Demo](https://github.com/korewireless/Microvisor-Demo-Azure).
 
 You may benefit from enabling additional debugging in the demo application as you are working with it, to obtain the most verbose logging you can un-comment the debugging directives in CMakeLists.txt before building.
 
@@ -89,7 +88,7 @@ docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t mv-mqtt-demo-i
 
 Run the build:
 
-```
+```shell
 docker run -it --rm -v $(pwd)/:/home/mvisor/project/ \
   --env-file env.list \
   --name mv-mqtt-demo mv-mqtt-demo-image
@@ -120,8 +119,8 @@ info symbol <...>
 Under Ubuntu, run the following:
 
 ```bash
-sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi \
-  git curl build-essential cmake libsecret-1-dev jq openssl
+sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi curl git \
+  build-essential cmake libsecret-1-dev jq openssl gdb-multiarch
 ```
 
 #### Twilio CLI
@@ -144,11 +143,11 @@ Close your terminal window or tab, and open a new one. Now run:
 twilio plugins:install "@twilio/plugin-microvisor@0.3.7"
 ```
 
-Note: This project currently requires the plugin-microvisor version 0.3.7.  It will not work with newer versions of the plugin.
+**Note** This project currently requires the plugin-microvisor version 0.3.7.  It will not work with newer versions of the plugin.
 
 ### Environment Variables
 
-Running the Twilio CLI and the project's [deploy script](./deploy.sh) — for uploading the built code to the Twilio cloud and subsequent deployment to your Microvisor Nucleo Board — uses the following Twilio credentials stored as environment variables. They should be added to your shell profile:
+Running the Twilio CLI and the project's [deploy script](./deploy.sh) — for uploading the built code to the Microvisor cloud and subsequent deployment to your Microvisor Nucleo Board — uses the following Twilio credentials stored as environment variables. They should be added to your shell profile:
 
 ```bash
 export TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -156,13 +155,9 @@ export TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 export MV_DEVICE_SID=UVxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-You can get the first two from your Twilio Console [account dashboard](https://console.twilio.com/).
+You can get the first two from your [Twilio Console account dashboard](https://console.twilio.com/).
 
-Enter the following command to get your target device’s SID and, if set, its unqiue name:
-
-```bash
-twilio api:microvisor:v1:devices:list
-```
+The third value cane be found in the [**Iot > Microvisor > Devices** section](https://console.twilio.com/us1/develop/iot/microvisor/devices). It is also accessible via the QR code on the back of your development board. Scan the code with your mobile phone and a suitable app, and the board’s SID is the third `/`-separated field.
 
 ## Build and Deploy the Application
 
@@ -233,9 +228,9 @@ You will need to pass the path to the private key to the Twilio CLI Microvisor p
 
 ## Copyright and Licensing
 
-The sample code and Microvisor SDK is © 2022, Twilio, Inc. It is licensed under the terms of the [Apache 2.0 License](./LICENSE).
+The sample code and Microvisor SDK is © 2022-23, KORE Wireless. It is licensed under the terms of the [Apache 2.0 License](./LICENSE).
 
-The SDK makes used of code © 2021, STMicroelectronics and affiliates. This code is licensed under terms described in [this file](https://github.com/twilio/twilio-microvisor-hal-stm32u5/blob/main/LICENSE-STM32CubeU5.md).
+The SDK makes used of code © 2021, STMicroelectronics and affiliates. This code is licensed under terms described in [this file](https://github.com/korewireless/Microvisor-HAL-STM32U5/blob/main/LICENSE-STM32CubeU5.md).
 
 The SDK makes use [ARM CMSIS](https://github.com/ARM-software/CMSIS_5) © 2004, ARM. It is licensed under the terms of the [Apache 2.0 License](./LICENSE).
 
