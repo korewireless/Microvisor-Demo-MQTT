@@ -73,7 +73,7 @@ target_include_directories(ST_Code PUBLIC
 )
 
 target_link_libraries(ST_Code LINK_PUBLIC
-    Microvisor-HAL-STM32U55
+    Microvisor-HAL-STM32U5
     FreeRTOS
 )
 
