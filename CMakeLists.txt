@@ -31,9 +31,6 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/toolchain.cmake")
 
 project(${PROJECT_NAME} C CXX ASM)
 
-include_directories(include
-                    ${twilio-microvisor-hal-stm32u5_INCLUDE_DIRS})
-
 set(INCLUDED_HAL_FILES
     Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal.c
     Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_cortex.c
@@ -53,18 +50,19 @@ set(INCLUDED_HAL_FILES
     Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_rcc_ex.c
     Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_tim.c
     Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_tim_ex.c
-    Drivers/CMSIS/Device/ST/STM32U5xx/Source/Templates/system_stm32u5xx_ns.c
-    Drivers/CMSIS/Device/ST/STM32U5xx/Source/Templates/gcc/startup_stm32u585xx.s
     Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_uart.c
     Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_uart_ex.c
+    Drivers/CMSIS/Device/ST/STM32U5xx/Source/Templates/system_stm32u5xx_ns.c
+    Drivers/CMSIS/Device/ST/STM32U5xx/Source/Templates/gcc/startup_stm32u585xx.s
 )
 
 # Load the HAL
-add_subdirectory(twilio-microvisor-hal-stm32u5)
+add_subdirectory(Microvisor-HAL-STM32U5)
 
 # Build the STM32 middleware
 add_library(ST_Code STATIC
-    ST_Code/Core/Src/syscalls.c ST_Code/Core/Src/sysmem.c
+    ST_Code/Core/Src/syscalls.c
+    ST_Code/Core/Src/sysmem.c
     ST_Code/Core/Src/stm32u5xx_hal_msp.c
     ST_Code/CMSIS_RTOS_V2/cmsis_os2.c
 )
@@ -75,8 +73,9 @@ target_include_directories(ST_Code PUBLIC
 )
 
 target_link_libraries(ST_Code LINK_PUBLIC
-    twilio-microvisor-hal-stm32u5
-    FreeRTOS)
+    Microvisor-HAL-STM32U5
+    FreeRTOS
+)
 
 # Build FreeRTOS
 add_library(FreeRTOS STATIC
@@ -94,8 +93,8 @@ add_library(FreeRTOS STATIC
 
 target_include_directories(FreeRTOS PUBLIC
     config/
-    FreeRTOS-Kernel/portable/GCC/ARM_CM33_NTZ/non_secure
     FreeRTOS-Kernel/include
+    FreeRTOS-Kernel/portable/GCC/ARM_CM33_NTZ/non_secure
 )
 
 # Load the application

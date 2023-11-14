@@ -6,7 +6,7 @@
 # Upload and deploy Microvisor application code
 #
 # @author    Tony Smith
-# @copyright 2022, Twilio
+# @copyright 2022-23, KORE Wireless
 # @version   1.8.4a
 # @license   MIT
 #
