@@ -36,7 +36,7 @@ add_executable(${PROJECT_NAME}
 # Link built libraries
 target_link_libraries(${PROJECT_NAME} LINK_PUBLIC
     ST_Code
-    twilio-microvisor-hal-stm32u5
+    Microvisor-HAL-STM32U5
     FreeRTOS)
 
 # Build .bin file required for app bundle creation
